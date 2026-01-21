@@ -1,0 +1,93 @@
+# IVR Management Dashboard - Warp Configuration
+
+## Project Overview
+A comprehensive web application for managing and configuring Interactive Voice Response (IVR) routing systems. Built with React 18, TypeScript, Vite, and modern UI libraries.
+
+## Technology Stack
+- **Framework**: React 18.3.1 with TypeScript
+- **Build Tool**: Vite 6.3.5
+- **Package Manager**: pnpm
+- **Routing**: React Router DOM v7.11.0
+- **UI Components**: Radix UI (shadcn/ui), Material-UI
+- **Styling**: Tailwind CSS v4.1.12
+- **Charts**: Recharts 2.15.2
+- **Flow Diagrams**: @xyflow/react 12.10.0
+- **Notifications**: Sonner 2.0.3
+- **Forms**: React Hook Form 7.55.0
+
+## Key Features
+- Dashboard with real-time call monitoring and system health
+- Routing management with advanced search and filtering
+- Segment configuration (Menu, Say, Scheduler, Recognize, Queue, Collect)
+- Message library (audio files + TTS)
+- Visual segment flow editor with drag-and-drop
+- Administration panel with audit logging
+
+## Project Structure
+```
+src/
+├── app/
+│   ├── components/
+│   │   ├── ui/                          # UI component library (shadcn)
+│   │   ├── AppLayout.tsx                # Main layout with sidebar
+│   │   ├── CreateRoutingDialog.tsx      # Routing creation wizard
+│   │   ├── CreateSegmentDialog.tsx      # Segment creation wizard
+│   │   ├── CreateMessageDialog.tsx      # Message upload/TTS wizard
+│   │   ├── SegmentFlowDialog.tsx        # Flow visualization dialog
+│   │   └── SegmentFlowVisualization.tsx # React Flow implementation
+│   ├── pages/
+│   │   ├── HomePage.tsx                 # Dashboard with metrics
+│   │   ├── RoutingPage.tsx              # Routing management
+│   │   ├── SegmentsPage.tsx             # Segment configuration
+│   │   ├── MessagesPage.tsx             # Message library
+│   │   └── AdminPage.tsx                # Administration
+│   └── App.tsx                          # Main app with routing
+├── styles/                               # CSS and Tailwind config
+└── main.tsx                              # Entry point
+
+guidelines/                               # Design and development guidelines
+```
+
+## Development Commands
+```bash
+# Install dependencies
+pnpm install
+
+# Start development server (default: http://localhost:5173)
+pnpm dev
+
+# Build for production
+pnpm build
+
+# Preview production build
+pnpm preview
+```
+
+## Path Aliases
+- `@/` → `./src/` (configured in vite.config.ts)
+
+## Current State
+- Uses mock data for demonstration
+- No backend integration yet
+- No authentication/authorization
+- No state management library (local state only)
+
+## Next Steps for Production
+1. Backend integration (REST/GraphQL + WebSockets)
+2. Authentication and authorization
+3. State management (Redux/Zustand)
+4. Testing (Jest, Playwright)
+5. Real-time monitoring and analytics
+
+## File Naming Conventions
+- Components: PascalCase (e.g., `AppLayout.tsx`)
+- Pages: PascalCase with "Page" suffix (e.g., `HomePage.tsx`)
+- Dialogs: PascalCase with "Dialog" suffix (e.g., `CreateRoutingDialog.tsx`)
+- Styles: kebab-case (e.g., `tailwind.css`)
+
+## Important Notes
+- Port conflicts: Vite defaults to 5173, check if available
+- Path resolution uses absolute paths with `@/` alias
+- UI components from shadcn/ui are in `src/app/components/ui/`
+- Mock data is embedded in page components
+- React Flow is used for visual segment flow diagrams

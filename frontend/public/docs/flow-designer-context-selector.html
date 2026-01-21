@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Context-Aware Flow Designer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: #f5f6fa;
+            padding: 0;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            background: white;
+            border-bottom: 2px solid #ecf0f1;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .top-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .top-bar h1 {
+            font-size: 18px;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        /* Context Selector */
+        .context-selector {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #f8f9fa;
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 2px solid #ecf0f1;
+        }
+
+        .context-selector label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #7f8c8d;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .context-selector select {
+            font-size: 14px;
+            padding: 6px 32px 6px 12px;
+            border: 2px solid #3498db;
+            border-radius: 6px;
+            background: white;
+            color: #2c3e50;
+            font-weight: 600;
+            cursor: pointer;
+            outline: none;
+            min-width: 200px;
+        }
+
+        .context-selector select:hover {
+            border-color: #2980b9;
+        }
+
+        .context-badge {
+            background: #3498db;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .view-mode {
+            display: flex;
+            gap: 8px;
+            background: #f8f9fa;
+            padding: 4px;
+            border-radius: 6px;
+        }
+
+        .view-mode button {
+            padding: 6px 12px;
+            border: none;
+            background: transparent;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #7f8c8d;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .view-mode button.active {
+            background: white;
+            color: #3498db;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .view-mode button:hover:not(.active) {
+            color: #2c3e50;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: auto;
+        }
+
+        .canvas {
+            padding: 40px;
+            min-height: 100%;
+            position: relative;
+        }
+
+        .side-panel {
+            width: 350px;
+            background: white;
+            border-left: 2px solid #ecf0f1;
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        /* Info Banner */
+        .info-banner {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px 20px;
+            margin: 20px 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .info-banner .icon {
+            font-size: 24px;
+        }
+
+        .info-banner .text {
+            flex: 1;
+        }
+
+        .info-banner .title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .info-banner .desc {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        /* Nodes */
+        .node {
+            border: 2px solid;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            position: absolute;
+            transition: all 0.2s;
+        }
+
+        .node:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transform: translateY(-2px);
+        }
+
+        .node.standard {
+            border-color: #3498db;
+        }
+
+        .node.intent {
+            border-color: #9b59b6;
+            background: linear-gradient(135deg, #f5f0ff 0%, #ffffff 100%);
+        }
+
+        .node.context-aware {
+            border-color: #3498db;
+            border-width: 3px;
+            box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.1);
+        }
+
+        .node.target {
+            border-color: #27ae60;
+        }
+
+        .node-header {
+            background: #3498db;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 6px 6px 0 0;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .node-header.intent {
+            background: #9b59b6;
+        }
+
+        .node-header.target {
+            background: #27ae60;
+        }
+
+        .node-type {
+            font-size: 11px;
+            opacity: 0.9;
+            margin-top: 2px;
+        }
+
+        .node-body {
+            padding: 16px;
+        }
+
+        .transition-item {
+            padding: 10px 12px;
+            margin: 6px 0;
+            border-radius: 6px;
+            background: #f8f9fa;
+            border-left: 3px solid #9b59b6;
+            font-size: 13px;
+        }
+
+        .transition-result {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 4px;
+        }
+
+        .transition-target {
+            color: #7f8c8d;
+            font-size: 12px;
+        }
+
+        .context-override-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: #3498db;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-left: 6px;
+        }
+
+        /* Connection lines */
+        .connection-line {
+            stroke-width: 2.5;
+            fill: none;
+            opacity: 0.8;
+        }
+
+        .connection-line.standard {
+            stroke: #9b59b6;
+        }
+
+        .connection-line.context {
+            stroke: #3498db;
+            stroke-dasharray: 5, 5;
+        }
+
+        /* Side Panel */
+        .side-panel h2 {
+            font-size: 16px;
+            color: #2c3e50;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .side-panel h3 {
+            font-size: 13px;
+            color: #7f8c8d;
+            margin: 20px 0 12px 0;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 12px;
+        }
+
+        .info-box.success {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+
+        .info-box.warning {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+        }
+
+        .info-box-title {
+            font-weight: 600;
+            font-size: 12px;
+            color: #2c3e50;
+            margin-bottom: 6px;
+        }
+
+        .info-box-text {
+            font-size: 11px;
+            color: #5d6d7e;
+            line-height: 1.5;
+        }
+
+        .context-list {
+            background: white;
+            border: 1px solid #ecf0f1;
+            border-radius: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .context-list-item {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f8f9fa;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .context-list-item:hover {
+            background: #f8f9fa;
+        }
+
+        .context-list-item.active {
+            background: #e3f2fd;
+            border-left: 3px solid #3498db;
+        }
+
+        .context-list-item:last-child {
+            border-bottom: none;
+        }
+
+        .context-key {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .transition-count {
+            background: #ecf0f1;
+            color: #7f8c8d;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .json-viewer {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-family: 'Courier New', monospace;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .json-viewer pre {
+            margin: 0;
+            line-height: 1.5;
+            color: #2c3e50;
+        }
+
+        code {
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            color: #e67e22;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Top Bar with Context Selector -->
+        <div class="top-bar">
+            <div class="top-bar-left">
+                <h1>🎯 Context-Aware Flow Designer</h1>
+                
+                <div class="context-selector">
+                    <label>
+                        <span>📊 Context View:</span>
+                    </label>
+                    <select id="contextSelector" onchange="changeContext()">
+                        <option value="base">Base Layout (no context)</option>
+                        <option value="RESI_STANDARD" selected>RESI_STANDARD</option>
+                        <option value="PROF_STANDARD">PROF_STANDARD</option>
+                        <option value="ENTERPRISE">ENTERPRISE</option>
+                        <option value="all">All Contexts (overlay)</option>
+                    </select>
+                    <span class="context-badge">3 overrides</span>
+                </div>
+            </div>
+
+            <div class="view-mode">
+                <button class="active">Flow View</button>
+                <button>JSON View</button>
+                <button>Diff View</button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="canvas-container">
+                <div class="info-banner">
+                    <span class="icon">💡</span>
+                    <div class="text">
+                        <div class="title">Viewing: RESI_STANDARD Context</div>
+                        <div class="desc">Showing only transitions that differ from base layout for residential standard customers</div>
+                    </div>
+                </div>
+
+                <div class="canvas">
+                    <svg width="100%" height="600" style="position: absolute; top: 0; left: 0; pointer-events: none;">
+                        <defs>
+                            <marker id="arrow-std" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                                <polygon points="0 0, 10 3, 0 6" fill="#9b59b6" opacity="0.8" />
+                            </marker>
+                            <marker id="arrow-ctx" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                                <polygon points="0 0, 10 3, 0 6" fill="#3498db" opacity="0.8" />
+                            </marker>
+                        </defs>
+
+                        <!-- Connections -->
+                        <path d="M 210 120 L 210 220" class="connection-line standard" marker-end="url(#arrow-std)"/>
+                        <path d="M 310 300 L 550 300" class="connection-line context" marker-end="url(#arrow-ctx)"/>
+                        <path d="M 310 360 L 550 420" class="connection-line standard" marker-end="url(#arrow-std)"/>
+                    </svg>
+
+                    <!-- Nodes -->
+                    <div class="node standard" style="left: 120px; top: 40px; width: 180px;">
+                        <div class="node-header">
+                            <div>Start</div>
+                            <div class="node-type">get_language</div>
+                        </div>
+                    </div>
+
+                    <div class="node intent" style="left: 80px; top: 220px; width: 220px;">
+                        <div class="node-header intent">
+                            <div>Intent Router</div>
+                            <div class="node-type">intent • context-aware</div>
+                        </div>
+                        <div class="node-body">
+                            <div class="transition-item">
+                                <div class="transition-result">
+                                    PREMIUM
+                                    <span class="context-override-badge">🔄 Override</span>
+                                </div>
+                                <div class="transition-target">→ Residential Flow (RESI_STANDARD)</div>
+                            </div>
+                            <div class="transition-item">
+                                <div class="transition-result">STANDARD</div>
+                                <div class="transition-target">→ Standard Flow (base)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="node target context-aware" style="left: 550px; top: 270px; width: 180px;">
+                        <div class="node-header target">
+                            <div>Residential Flow</div>
+                            <div class="node-type">menu</div>
+                        </div>
+                        <div style="padding: 12px; font-size: 11px; color: #7f8c8d; text-align: center; background: rgba(52, 152, 219, 0.05);">
+                            Context-specific target
+                        </div>
+                    </div>
+
+                    <div class="node target" style="left: 550px; top: 390px; width: 180px;">
+                        <div class="node-header target">
+                            <div>Standard Flow</div>
+                            <div class="node-type">menu</div>
+                        </div>
+                        <div style="padding: 12px; font-size: 11px; color: #7f8c8d; text-align: center;">
+                            Base layout target
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Side Panel -->
+            <div class="side-panel">
+                <h2>
+                    <span>🎛️</span>
+                    Context Configuration
+                </h2>
+
+                <div class="info-box success">
+                    <div class="info-box-title">✅ Context-Aware Design</div>
+                    <div class="info-box-text">
+                        Designer shows only transitions that differ from base layout for the selected context.
+                    </div>
+                </div>
+
+                <h3>📋 Available Contexts</h3>
+                <div class="context-list">
+                    <div class="context-list-item">
+                        <span class="context-key">Base Layout</span>
+                        <span class="transition-count">2 trans.</span>
+                    </div>
+                    <div class="context-list-item active">
+                        <span class="context-key">RESI_STANDARD</span>
+                        <span class="transition-count">1 override</span>
+                    </div>
+                    <div class="context-list-item">
+                        <span class="context-key">PROF_STANDARD</span>
+                        <span class="transition-count">1 override</span>
+                    </div>
+                    <div class="context-list-item">
+                        <span class="context-key">ENTERPRISE</span>
+                        <span class="transition-count">1 override</span>
+                    </div>
+                </div>
+
+                <h3>🔍 What Changes?</h3>
+                <div class="info-box">
+                    <div class="info-box-text">
+                        For <code>RESI_STANDARD</code> context:
+                        <br><br>
+                        <strong>PREMIUM</strong> → residential_flow <span style="color: #3498db;">(override)</span><br>
+                        <strong>STANDARD</strong> → standard_flow <span style="color: #7f8c8d;">(base)</span>
+                    </div>
+                </div>
+
+                <h3>💾 Data Structure</h3>
+                <div class="json-viewer">
+<pre>{
+  "segmentName": "intent_router",
+  "segmentType": "intent",
+  "transitions": {
+    "on": {
+      "PREMIUM": {
+        "contextKey": {
+          "RESI_STANDARD": {
+            "nextSegment": "residential_flow"
+          },
+          "PROF_STANDARD": {
+            "nextSegment": "professional_flow"
+          },
+          "ENTERPRISE": {
+            "nextSegment": "enterprise_flow"
+          }
+        },
+        "default": "general_premium_flow"
+      },
+      "STANDARD": {
+        "nextSegment": "standard_flow"
+      }
+    }
+  }
+}</pre>
+                </div>
+
+                <h3>📤 Export/Import</h3>
+                <div class="info-box warning">
+                    <div class="info-box-title">Full Structure Preserved</div>
+                    <div class="info-box-text">
+                        Export includes complete nested structure. Import reconstructs all context-specific routing paths.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function changeContext() {
+            const selector = document.getElementById('contextSelector');
+            const selected = selector.value;
+            
+            // In a real implementation, this would:
+            // 1. Filter transitions based on selected context
+            // 2. Highlight context-specific overrides
+            // 3. Update node connections
+            // 4. Show base layout for non-overridden transitions
+            
+            console.log('Context changed to:', selected);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,401 @@
+---
+description: "Routing Data Layer - Core enforcement rules for documentation, agent selection, memory usage, and change tracking"
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# Cursor Rules - Routing Data Layer
+
+**Version**: 3.0.0
+**Last Updated**: 2026-01-12
+**Status**: Active
+
+**Note**: This file is the **single source of truth** for enforcement rules. Other files (AGENTS.md, CLAUDE.md) reference these rules but do not duplicate them.
+
+---
+
+## CRITICAL ENFORCEMENT RULES - READ FIRST
+
+**These rules MUST be followed for EVERY task. No exceptions.**
+
+### Rule Enforcement
+
+These rules are enforced through:
+1. **Code Review**: PR reviewers verify design docs updated and change history recorded
+2. **Self-Check**: Pre-commit checklist (see below) must be completed
+3. **Manual Review**: Periodic audit of AGENTS.md change history
+
+**Violations**: If rules are violated, PR will be blocked until compliance is achieved.
+
+---
+
+## 1. Documentation Rules
+
+**CRITICAL**: See `.claude/skills/repository-rules/documentation.md` for complete rules.
+
+### Quick Reference
+
+**STRICTLY FORBIDDEN - NEVER CREATE:**
+
+- **NEVER** create .md files unless the user EXPLICITLY requests it in their message
+- **NEVER** create completion reports, status summaries, or progress documents
+- **NEVER** create README files, RESULTS files, SUMMARY files, or TEST_RESULTS files
+- **NEVER** create new documentation files "for reference" or "for future use"
+- **NEVER** include emoji or icon glyphs in ANY file
+- **NO EXCEPTIONS**: Results, summaries, and README files are STRICTLY FORBIDDEN
+- If unsure, ASK the user first - do not assume
+
+### What IS Allowed
+
+- **Code comments** - Inline comments, JSDoc, TypeDoc annotations (always allowed)
+- **Output files** - JSON, CSV, XML, YAML, SQL scripts from tools/agents (always allowed)
+- **Configuration files** - .json, .yaml, .toml config files (always allowed)
+- **Updating existing .md files** - When explicitly instructed or as part of mandatory design doc updates
+- **Workflow files** - Implementation workflows in `.claude/workflows/` following the established pattern (see CLAUDE.md)
+
+### Service Document Updates
+
+**MANDATORY updates when making ACTUAL design/schema changes:**
+
+- **routing-table design changes** → Update `docs/design/routing-table/` topic files (e.g., `database-schema.md`, `api-contracts.md`)
+- **segment-store design changes** → Update `docs/design/segment-store/` topic files
+- **message-store design changes** → Update `docs/design/message-store/` topic files
+- **Schema changes** → **ALWAYS** update `services/backend/prisma/COMPLETE_DATABASE_SCHEMA.sql`
+
+**Update Workflow:**
+
+1. **Make code changes first** (schema, API, data models)
+2. **Then update design docs** in the same commit/session
+3. **Commit together** - Code changes and design doc updates in same commit
+4. **Verify accuracy** - Ensure design docs reflect actual implementation
+
+**DO NOT** update design documents for:
+- Bug fixes that don't change design
+- Code refactoring that doesn't change interfaces
+- Test updates
+- Performance optimizations that don't affect design
+
+**See**: `.claude/skills/repository-rules/documentation.md` for complete documentation rules
+
+---
+
+## 2. Agent Selection Rules
+
+**Available Agents (13 total):**
+
+### Core Pipeline Agents (5)
+
+- **architect**: Design approval, cross-module decisions, architecture validation
+- **developer**: Full-stack TypeScript implementation
+- **code-reviewer**: TypeScript/NestJS/React quality gate
+- **test-runner**: Jest execution, coverage validation
+- **debugger**: Bug diagnosis, root cause analysis
+
+### Specialty Agents (8)
+
+- **security-scanner**: Vulnerability scanning, OWASP compliance
+- **requirements-analyst**: Codebase analysis, tech debt identification
+- **system-architect-2025**: Modern architecture design, scalability
+- **design-director-platform**: Platform redesigns, UX/accessibility
+- **design-system-architect**: Design systems, tokens, components
+- **interaction-design-optimizer**: UX flow optimization
+- **doc-writer**: Documentation creation (when explicitly requested)
+- **refactor**: Code modernization, design patterns
+
+**Agent Selection Decision Tree:**
+
+```
+Is this a SECURITY-CRITICAL feature?
+ ├─ YES → Use security-scanner → system-architect → architect → developer
+
+Is this a MAJOR PLATFORM REDESIGN?
+ ├─ YES → Use design-director → designers → developers
+
+Is this a LARGE ARCHITECTURE CHANGE?
+ ├─ YES → Use requirements-analyst → system-architect → architect → developer
+
+Otherwise → Use FEATURE_WORKFLOW (core agents only)
+ (architect → developer → code-reviewer → test-runner)
+```
+
+---
+
+## 2.5 RBAC Implementation Rules
+
+**See**: `.claude/skills/architecture/rbac.md` for complete RBAC documentation.
+
+**Quick Reference:**
+
+1. **Always use granular domain-specific roles** - NOT simple VIEWER/EDITOR/OPS/ADMIN
+2. **Enforce customer scoping** - Users should only see data for customers they have access to
+3. **Two-level authorization** - Check BOTH domain role AND customer scope
+4. **Use @RequireCustomerScope()** - On all endpoints accessing customer-specific data
+5. **Reference permission matrix** - Check `services/backend/src/auth/roles.enum.ts`
+
+---
+
+## 3. Memory Usage Rules
+
+**See**: `.claude/skills/repository-rules/memory-usage.md` for complete guide.
+
+### Memory Usage - Decision Tree
+
+- ✅ **REQUIRED**: Architecture changes, design decisions, new patterns
+- ✅ **REQUIRED**: Cross-module integration, API contracts, schema changes
+- ✅ **REQUIRED**: New components, services, or significant features
+- ⚠️ **OPTIONAL**: Bug fixes, typo corrections, formatting changes
+- ⚠️ **OPTIONAL**: Simple refactoring that doesn't change interfaces
+
+**Rule of thumb**: If the change affects how other developers would understand the system, use memory.
+
+### Quick Workflow
+
+**Before tasks:**
+
+1. `mcp_memory_read_graph()` - Get full context
+2. `mcp_memory_search_nodes(query)` - Search for relevant entities
+3. `mcp_memory_open_nodes([names])` - Get specific entity details
+
+**After completing work:**
+
+1. `mcp_memory_add_observations()` - Add new learnings
+2. `mcp_memory_create_entities()` - Create new entities if needed
+3. `mcp_memory_create_relations()` - Link entities (use active voice)
+
+**Timing**: Query memory first (planning), update after code/docs complete.
+
+---
+
+## 4. Change Tracking Rules
+
+**Structural Code Change Time Tracking - MANDATORY:**
+
+For **EVERY structural code change**, you **MUST** record:
+
+1. **Start time** (ISO 8601 format: `YYYY-MM-DDTHH:mm:ssZ`)
+2. **One sentence description** of the change
+
+**What Constitutes a "Structural Code Change":**
+
+- Creating new files (services, modules, controllers, components)
+- Deleting files
+- Modifying file structure (moving files, renaming directories)
+- Adding new dependencies or removing dependencies
+- Database schema changes (Prisma migrations, schema modifications)
+- Adding or removing major features/modules
+- Refactoring that changes module boundaries or interfaces
+
+**Where to Record:**
+
+- **In the appropriate AGENTS.md file** - This is the ONLY and REQUIRED location
+  - Root `AGENTS.md` for workspace-wide or cross-service changes
+  - Module `AGENTS.md` for changes within a specific module
+  - **MUST be placed at the end of the file in a "Change History" section**
+
+**Format for AGENTS.md:**
+
+```text
+## Change History
+
+- **YYYY-MM-DDTHH:mm:ssZ**: [One sentence description of the change]
+```
+
+---
+
+## 3.5 Git Commit Protocol
+
+**CRITICAL**: Before suggesting code changes, ALWAYS review past commits first.
+
+### When to Commit
+
+**ALWAYS ask the user to commit when:**
+
+1. **Code changes applied** - Any modification to source code
+2. **New feature completed** - Feature is functional and tested
+3. **Plan finished** - All items in a plan are completed
+4. **Task completed** - User-requested task is done
+5. **Milestone reached** - Significant progress made
+
+### Pre-Commit Workflow
+
+**Before applying ANY code changes:**
+
+1. **Review recent commits:**
+   ```bash
+   git log --oneline -10
+   git log --stat -3
+   ```
+
+2. **Check what's uncommitted:**
+   ```bash
+   git status
+   git diff --stat
+   ```
+
+3. **Understand context:**
+   - What was the last commit about?
+   - Are there related uncommitted changes?
+   - Should changes be separate commits or combined?
+
+### Post-Work Protocol
+
+**After completing work:**
+
+1. Review all changes made
+2. Check if tests pass
+3. Ask user: "Should we commit these changes?"
+4. Suggest commit message based on work done
+5. Wait for user approval before committing
+
+**DO NOT:**
+- Commit without user approval
+- Skip reviewing past commits
+- Assume changes should be committed
+- Create commits during implementation (wait until end)
+
+---
+
+## Session Start Protocol
+
+**EVERY session MUST begin with:**
+
+1. Read MCP Memory: `mcp_memory_read_graph()`
+2. Read root `AGENTS.md`
+3. If working on a module, read the module's `AGENTS.md` and design `INDEX.md`
+4. Read `.cursor/rules/rules.mdc` (this file)
+5. **Review recent git commits** to understand project state
+
+---
+
+## Task Completion Protocol
+
+**After EVERY task:**
+
+1. Update MCP Memory (add observations, create entities if needed)
+2. Update root `AGENTS.md` with change history entry (if structural change)
+3. Update module `AGENTS.md` with change history entry (if structural change within that module)
+4. **MANDATORY**: If you made ACTUAL design/schema changes, update service-specific design topic files (see above) **AFTER** the changes are complete
+5. **MANDATORY**: If you made GLOBAL changes, update `docs/design/GLOBAL_ARCHITECTURE.md`
+
+**Timing Clarification:**
+
+- **"AFTER changes complete"** means: Update design docs in the same commit as code changes, before marking PR as ready for review
+- Design docs should be updated immediately after code changes, not in a separate PR
+
+---
+
+## Language-Specific Coding Standards
+
+**See**: `.claude/skills/coding-standards/` for complete standards.
+
+### TypeScript Requirements
+
+**CRITICAL: TypeScript strict mode is enabled - all code must be type-safe**
+
+- **NEVER use `any` type** - Use proper types or `unknown` with type guards
+- **Always type function parameters and return values**
+- Run `npm run type-check` before committing
+
+**See**: `.claude/skills/coding-standards/typescript.md`
+
+### SQL Requirements
+
+- **Always use parameterized queries** (Prisma handles this)
+- **SQL migrations must be idempotent**
+- **Always update COMPLETE_DATABASE_SCHEMA.sql** when schema changes
+
+**See**: `.claude/skills/coding-standards/sql.md`
+
+### Testing Requirements
+
+- **Mock-based unit testing ONLY** (no real database)
+- Use standard PrismaService mock pattern
+
+**See**: `.claude/skills/coding-standards/testing.md`
+
+---
+
+## Pre-Commit Checklist - ENFORCE THESE RULES
+
+**Before completing ANY task, verify:**
+
+1. **Documentation Creation Check:**
+   - [ ] Did I create any .md files? → **STOP** - Only if user explicitly requested
+   - [ ] Did I create README, RESULTS, SUMMARY, or TEST_RESULTS files? → **DELETE** them immediately
+   - [ ] Did I include emoji/glyphs? → **REMOVE** them immediately
+   - [ ] Did I create status/completion reports? → **DELETE** them
+
+2. **Service Document Update Check (only if ACTUAL design changes):**
+   - [ ] Did I change database schema? → Update module `database-schema.md`, ERD, COMPLETE_DATABASE_SCHEMA.sql (after changes)
+   - [ ] Did I change API contracts/DTOs? → Update module `api-contracts.md` (after changes)
+   - [ ] Did I change Auth/Roles? → Update GLOBAL_ARCHITECTURE.md section 11 (after changes)
+   - [ ] Did I change UI/UX design? → Update GLOBAL_UI_DESIGN.md (after changes)
+   - [ ] Did I make bug fixes/refactoring only? → NO design doc updates needed
+
+3. **Change History Check:**
+   - [ ] Did I make structural changes? → Record in AGENTS.md with timestamp
+   - [ ] Did I modify module code? → Record in module AGENTS.md
+
+4. **Global Architecture Check:**
+   - [ ] Did I make GLOBAL changes (infrastructure, database setup, deployment, technology stack)? → Update `docs/design/GLOBAL_ARCHITECTURE.md`
+
+5. **Memory Update Check:**
+   - [ ] Did I learn something new? → Add to MCP memory
+   - [ ] Did I create new patterns? → Create memory entities
+
+6. **Git Commit Check:**
+   - [ ] Did I review recent commits before starting? → If not, review now
+   - [ ] Did I apply code changes? → Ask user if we should commit
+   - [ ] Did I complete a feature/task/plan? → Suggest commit with message
+   - [ ] Are there uncommitted changes from previous work? → Discuss with user
+
+---
+
+## Enforcement Summary
+
+**CRITICAL RULES - NO EXCEPTIONS:**
+
+1. **Documentation Creation:**
+ - NEVER create .md files unless user EXPLICITLY requests it
+ - NEVER create README, RESULTS, SUMMARY, or TEST_RESULTS files (NO EXCEPTIONS)
+ - If unsure, ASK - do not assume
+ - Violation is a critical error
+
+2. **Git Commit Protocol:**
+ - ALWAYS review recent commits before applying code changes
+ - ALWAYS ask user if changes should be committed after completion
+ - NEVER commit without explicit user approval
+ - Suggest appropriate commit messages based on work done
+
+3. **Service Document Updates (only for ACTUAL design changes, AFTER changes complete):**
+   - routing-table design changes → Update topic files in `docs/design/routing-table/`
+   - segment-store design changes → Update topic files in `docs/design/segment-store/`
+   - message-store design changes → Update topic files in `docs/design/message-store/`
+   - Schema changes → **ALWAYS** update `services/backend/prisma/COMPLETE_DATABASE_SCHEMA.sql`
+   - Auth/Roles changes → Update `docs/design/GLOBAL_ARCHITECTURE.md` section 11
+   - UI/UX changes → Update `docs/design/ui-design/GLOBAL_UI_DESIGN.md`
+
+4. **Change Tracking:**
+   - ALL structural changes → Record in AGENTS.md with timestamp
+   - Module changes → Record in module AGENTS.md
+   - GLOBAL changes (infrastructure, database, deployment, tech stack) → Update GLOBAL_ARCHITECTURE.md
+
+5. **Memory Maintenance:**
+   - Before thinking/planning → Query memory to understand context
+   - After every task → Update MCP memory
+   - New patterns → Create entities and relations
+
+**Your job: code, maintain AGENTS.md, update design docs, update MCP memory. NOT create documentation libraries.**
+
+---
+
+## Rules Change History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 2.0.0 | 2025-12-22 | Added versioning, edge cases section, clarified memory usage, improved change history format |
+| 3.0.0 | 2026-01-12 | **Modular redesign**: Simplified to 283 lines (59% reduction), extracted detailed content to `.claude/skills/` files, updated module references to INDEX.md navigation, enhanced with skill file cross-references |
+
+---
+
+**For detailed guidance, see `.claude/skills/INDEX.md`**

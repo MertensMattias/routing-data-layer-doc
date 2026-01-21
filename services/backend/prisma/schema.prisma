@@ -1,0 +1,579 @@
+// Routing Data Layer - IVR Configuration Platform
+// Prisma schema for RoutingTable, SegmentStore, and MessageStore modules
+// Version: 2.2.0 - CamelCase fields with @map to PascalCase DB columns
+// Production-safe deletion: MessageStore uses NoAction (protective), SegmentConfig uses Cascade
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider          = "sqlserver"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+  schemas           = ["dbo", "ivr"]
+}
+
+// ============================================================================
+// SHARED CONFIGURATION SCHEMA (cfg)
+// ============================================================================
+
+/// Shared dictionary: Environment configurations (dvp/acc/prd)
+/// Note: Used for reference data only; environment isolation via separate databases
+model DicEnvironment {
+  environment String   @id @map("Environment") @db.VarChar(20)
+  displayName String   @map("DisplayName") @db.NVarChar(128)
+  description String?  @map("Description") @db.NVarChar(500)
+  urlBase     String?  @map("UrlBase") @db.VarChar(256)
+  config      String?  @map("Config") @db.NVarChar(4000) // JSON
+  isActive    Boolean  @default(true) @map("IsActive")
+  dateCreated DateTime @default(now()) @map("DateCreated") @db.DateTime2
+  dateUpdated DateTime @updatedAt @map("DateUpdated") @db.DateTime2
+
+  @@schema("ivr")
+  @@map("cfg_Dic_Environment")
+}
+
+/// Shared dictionary: Customer + Project combinations
+model DicCompanyProject {
+  companyProjectId Int      @id @default(autoincrement()) @map("CompanyProjectId")
+  customerId       String   @map("CustomerId") @db.VarChar(64)
+  projectId        String   @map("ProjectId") @db.VarChar(64)
+  displayName      String   @map("DisplayName") @db.NVarChar(128)
+  description      String?  @map("Description") @db.NVarChar(512)
+  oktaGroup        String   @map("OktaGroup") @db.VarChar(100) // Okta group for customer scope (e.g., "okta-digipolis-flow")
+  isActive         Boolean  @default(true) @map("IsActive")
+  dateCreated      DateTime @default(now()) @map("DateCreated") @db.DateTime2
+  createdBy        String?  @map("CreatedBy") @db.VarChar(100)
+  dateUpdated      DateTime @updatedAt @map("DateUpdated") @db.DateTime2
+  updatedBy        String?  @map("UpdatedBy") @db.VarChar(100)
+
+  routingTables RoutingTable[]
+  messageStores MessageStore[]
+
+  @@unique([customerId, projectId], name: "uq_customer_project")
+  @@unique([oktaGroup], name: "uq_okta_group")
+  @@index([customerId])
+  @@index([isActive])
+  @@index([oktaGroup])
+  @@schema("ivr")
+  @@map("cfg_Dic_CompanyProject")
+}
+
+/// Canonical list of supported languages (BCP47)
+model DicLanguage {
+  languageCode String   @id @map("LanguageCode") @db.VarChar(10)
+  displayName  String   @map("DisplayName") @db.NVarChar(128)
+  nativeName   String?  @map("NativeName") @db.NVarChar(128)
+  sortOrder    Int      @default(0) @map("SortOrder")
+  isActive     Boolean  @default(true) @map("IsActive")
+  dateCreated  DateTime @default(now()) @map("DateCreated") @db.DateTime2
+  dateUpdated  DateTime @updatedAt @map("DateUpdated") @db.DateTime2
+
+  // Relations
+  routingTables          RoutingTable[]
+  voices                 DicVoice[]
+  voiceConfigs           MessageStoreVoiceConfig[]
+  messageLanguageContent MessageLanguageContent[]
+  messageStoresAsDefault MessageStore[]            @relation("MessageStoreDefaultLanguage")
+
+  @@schema("ivr")
+  @@map("cfg_Dic_Language")
+}
+
+/// ChangeSet: Draft/publish workflow for configuration changes
+model ChangeSet {
+  changeSetId   String    @id @default(dbgenerated("NEWID()")) @map("ChangeSetId") @db.UniqueIdentifier
+  routingId     String    @map("RoutingId") @db.VarChar(150)
+  customerId    String    @map("CustomerId") @db.VarChar(64)
+  projectId     String    @map("ProjectId") @db.VarChar(64)
+  status        String    @default("draft") @map("Status") @db.VarChar(20) // draft, validating, validated, publishing, published, discarded, archived
+  versionName   String    @map("VersionName") @db.NVarChar(128) // Version name for better tracking (e.g., "Q1 Menu Update")
+  description   String?   @map("Description") @db.NVarChar(500)
+  isActive      Boolean   @default(true) @map("IsActive")
+  dateCreated   DateTime  @default(now()) @map("DateCreated") @db.DateTime2
+  createdBy     String?   @map("CreatedBy") @db.VarChar(100)
+  datePublished DateTime? @map("DatePublished") @db.DateTime2
+  publishedBy   String?   @map("PublishedBy") @db.VarChar(100)
+
+  segments Segment[]
+
+  @@index([routingId], name: "ix_changeset_routing")
+  @@index([status], name: "ix_changeset_status")
+  @@index([dateCreated], name: "ix_changeset_created")
+  @@index([routingId, status, isActive], name: "ix_changeset_routing_status_active")
+  @@schema("ivr")
+  @@map("rt_ChangeSet")
+}
+
+// ============================================================================
+// ROUTING TABLE SCHEMA (rt)
+// ============================================================================
+
+/// Routing table: Entry point resolution (sourceId → routingId/config)
+/// Note: Environment isolation via deployment-based model (separate database per env)
+model RoutingTable {
+  routingTableId   String   @id @default(dbgenerated("NEWID()")) @map("RoutingTableId") @db.UniqueIdentifier
+  sourceId         String   @map("SourceId") @db.VarChar(150)
+  routingId        String   @map("RoutingId") @db.VarChar(150)
+  companyProjectId Int      @map("DicCompanyProjectId")
+  languageCode     String?  @map("LanguageCode") @db.VarChar(10)
+  messageStoreId   Int?     @map("MessageStoreId")
+  schedulerId      Int?     @map("SchedulerId")
+  initSegment      String   @default("init") @map("InitSegment") @db.VarChar(100)
+  featureFlags     String   @default("{}") @map("FeatureFlags") @db.NVarChar(4000) // JSON
+  config           String   @default("{}") @map("Config") @db.NVarChar(4000) // JSON
+  isActive         Boolean  @default(true) @map("IsActive")
+  dateCreated      DateTime @default(now()) @map("DateCreated") @db.DateTime2
+  createdBy        String?  @map("CreatedBy") @db.VarChar(100)
+  dateUpdated      DateTime @updatedAt @map("DateUpdated") @db.DateTime2
+  updatedBy        String?  @map("UpdatedBy") @db.VarChar(100)
+
+  // Relations
+  // Note: NoAction on companyProject prevents cyclic cascade issues through DicCompanyProject
+  // DESIGN DECISION: NoAction on messageStore provides protective deletion (blocks if referenced)
+  companyProject DicCompanyProject @relation(fields: [companyProjectId], references: [companyProjectId], onDelete: NoAction, onUpdate: NoAction)
+  languageRef    DicLanguage?      @relation(fields: [languageCode], references: [languageCode], onDelete: NoAction, onUpdate: NoAction)
+  messageStore   MessageStore?     @relation(fields: [messageStoreId], references: [messageStoreId], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([sourceId], name: "uq_routing_source")
+  @@index([routingId], name: "ix_routing_routingid")
+  @@index([companyProjectId], name: "ix_routing_company")
+  @@index([messageStoreId], name: "ix_routing_messagestore")
+  @@schema("ivr")
+  @@map("rt_RoutingTable")
+}
+
+/// Routing table history: Version snapshots for rollback
+/// Note: Environment isolation via deployment-based model (separate database per env)
+model RoutingTableHistory {
+  versionId     String   @id @default(dbgenerated("NEWID()")) @map("VersionId") @db.UniqueIdentifier
+  routingId     String   @map("RoutingId") @db.VarChar(150)
+  versionNumber Int      @map("VersionNumber")
+  isActive      Boolean  @default(false) @map("IsActive")
+  snapshot      String   @map("Snapshot") @db.NVarChar(Max) // JSON snapshot of entries
+  comment       String?  @map("Comment") @db.NVarChar(500)
+  dateCreated   DateTime @default(now()) @map("DateCreated") @db.DateTime2
+  createdBy     String?  @map("CreatedBy") @db.VarChar(100)
+
+  @@unique([routingId, versionNumber], name: "uq_history_version")
+  @@index([routingId], name: "ix_history_routing")
+  @@index([dateCreated], name: "ix_history_created")
+  @@schema("ivr")
+  @@map("rt_RoutingTableHistory")
+}
+
+
+// ============================================================================
+// SEGMENT STORE SCHEMA (seg)
+// ============================================================================
+
+/// Dictionary: Data types for segment configuration values
+model DicKeyType {
+  dicTypeId   Int     @id @default(autoincrement()) @map("DicTypeId")
+  typeName    String  @unique @map("TypeName") @db.VarChar(20)
+  displayName String? @map("DisplayName") @db.NVarChar(50)
+  description String? @map("Description") @db.NVarChar(200)
+
+  keys DicKey[]
+
+  @@schema("ivr")
+  @@map("seg_Dic_KeyType")
+}
+
+/// Dictionary: Segment type definitions (language, menu, scheduler, etc.)
+model DicSegmentType {
+  dicSegmentTypeId Int     @id @default(autoincrement()) @map("DicSegmentTypeId")
+  segmentTypeName  String  @unique @map("SegmentTypeName") @db.VarChar(50)
+  displayName      String? @map("DisplayName") @db.NVarChar(100)
+  description      String? @map("Description") @db.NVarChar(500)
+  category         String? @map("Category") @db.VarChar(50) // system, interactive, api, terminal, navigation
+  isTerminal       Boolean @default(false) @map("IsTerminal") // Terminal types: disconnect, transfer, hangup, callback
+  isActive         Boolean @default(true) @map("IsActive")
+  hooks            String? @map("Hooks") @db.NVarChar(Max) // Default hooks JSON
+  hooksSchema      String? @map("HooksSchema") @db.NVarChar(Max) // JSON Schema for validation
+
+  dicKeys  DicKey[]
+  segments Segment[]
+  keys     Key[]
+
+  @@schema("ivr")
+  @@map("seg_Dic_SegmentType")
+}
+
+/// Dictionary: Configuration keys per segment type
+model DicKey {
+  dicKeyId         Int     @id @default(autoincrement()) @map("DicKeyId")
+  dicSegmentTypeId Int     @map("DicSegmentTypeId")
+  keyName          String  @map("KeyName") @db.VarChar(100)
+  displayName      String? @map("DisplayName") @db.NVarChar(100)
+  dicTypeId        Int     @map("DicTypeId")
+  isRequired       Boolean @default(false) @map("IsRequired")
+  defaultValue     String? @map("DefaultValue") @db.NVarChar(4000)
+  isDisplayed      Boolean @default(true) @map("IsDisplayed")
+  isEditable       Boolean @default(true) @map("IsEditable")
+  isActive         Boolean @default(true) @map("IsActive")
+
+  segmentType DicSegmentType @relation(fields: [dicSegmentTypeId], references: [dicSegmentTypeId])
+  type        DicKeyType     @relation(fields: [dicTypeId], references: [dicTypeId])
+  keys        Key[]
+
+  @@unique([dicSegmentTypeId, keyName], name: "uq_key_segment_type_name")
+  @@schema("ivr")
+  @@map("seg_Dic_Key")
+}
+
+/// Segment: Segment instance for a routing
+/// Note: Environment isolation via deployment-based model (separate database per env)
+/// Note: routingId has no FK to RoutingTable - enforced at service level
+model Segment {
+  segmentId        String   @id @default(dbgenerated("NEWID()")) @map("SegmentId") @db.UniqueIdentifier
+  routingId        String   @map("RoutingId") @db.VarChar(150)
+  segmentName      String   @map("SegmentName") @db.VarChar(100)
+  dicSegmentTypeId Int      @map("DicSegmentTypeId")
+  displayName      String?  @map("DisplayName") @db.NVarChar(128)
+  changeSetId      String?  @map("ChangeSetId") @db.UniqueIdentifier // NULL = active/published, set = draft
+  segmentOrder     Int?     @map("SegmentOrder") @db.Int // Visual display order for UI rendering (nullable for backward compatibility)
+  hooks            String?  @map("Hooks") @db.NVarChar(Max) // Instance hooks JSON
+  isActive         Boolean  @default(true) @map("IsActive")
+  dateCreated      DateTime @default(now()) @map("DateCreated") @db.DateTime2
+  createdBy        String?  @map("CreatedBy") @db.VarChar(100)
+  dateUpdated      DateTime @updatedAt @map("DateUpdated") @db.DateTime2
+  updatedBy        String?  @map("UpdatedBy") @db.VarChar(100)
+
+  segmentType         DicSegmentType      @relation(fields: [dicSegmentTypeId], references: [dicSegmentTypeId])
+  changeSet           ChangeSet?          @relation(fields: [changeSetId], references: [changeSetId])
+  keys                Key[]
+  outgoingTransitions SegmentTransition[] @relation("SegmentTransitions")
+  incomingTransitions SegmentTransition[] @relation("NextSegment")
+  uiState             SegmentUIState?     // One-to-one relation for UI state
+
+  @@unique([routingId, segmentName, changeSetId], name: "uq_segment_routing_name")
+  @@unique([routingId, changeSetId, segmentId], name: "uq_segment_scope") // Composite key for DB-level FK enforcement
+  @@index([routingId], name: "ix_segment_routing")
+  @@index([dicSegmentTypeId], name: "ix_segment_type")
+  @@index([changeSetId], name: "ix_segment_changeset")
+  @@index([routingId, segmentOrder], name: "ix_segment_order") // Index for efficient ordering queries
+  @@schema("ivr")
+  @@map("seg_Segment")
+}
+
+/// Key: Configuration key-value pairs per segment
+/// CRITICAL: Composite primary key enforces uniqueness per segment+key combination
+/// Uses new Dic prefix naming convention with isDisplayed and isEditable flags
+model Key {
+  dicSegmentTypeId Int     @map("DicSegmentTypeId")
+  dicKeyId         Int     @map("DicKeyId")
+  segmentId        String  @map("SegmentId") @db.UniqueIdentifier
+  value            String? @map("Value") @db.NVarChar(Max)
+  isDisplayed      Boolean @default(true) @map("IsDisplayed")
+  isEditable       Boolean @default(true) @map("IsEditable")
+  configOrder      Int?    @map("ConfigOrder") @db.Int // Display order for UI rendering (nullable for backward compatibility)
+
+  dicSegmentType DicSegmentType @relation(fields: [dicSegmentTypeId], references: [dicSegmentTypeId], onDelete: NoAction, onUpdate: NoAction)
+  dicKey         DicKey         @relation(fields: [dicKeyId], references: [dicKeyId], onDelete: NoAction, onUpdate: NoAction)
+  segment        Segment        @relation(fields: [segmentId], references: [segmentId], onDelete: Cascade)
+
+  @@id([dicSegmentTypeId, dicKeyId, segmentId])
+  @@index([segmentId, configOrder], name: "ix_key_order")
+  @@schema("ivr")
+  @@map("seg_Key")
+}
+
+/// Segment transition: Result → next segment mapping
+/// Scope columns (routingId, changeSetId) enforce version safety
+/// NOTE: Composite FK constraints added via SQL migration for cross-routing/version prevention
+/// contextKey supports context-specific routing overrides
+/// NAME-BASED RESOLUTION: Uses sourceSegmentName and nextSegmentName for version-agnostic transitions
+model SegmentTransition {
+  segmentTransitionId String  @id @default(dbgenerated("NEWID()")) @map("SegmentTransitionId") @db.UniqueIdentifier
+
+  // Owner segment - KEEP for CASCADE delete
+  segmentId           String  @map("SegmentId") @db.UniqueIdentifier
+  sourceSegmentName   String? @map("SourceSegmentName") @db.VarChar(100)  // NEW: Name-based source reference
+
+  // Target segment - USE NAME, deprecate ID
+  nextSegmentId       String? @map("NextSegmentId") @db.UniqueIdentifier  // DEPRECATED: Use nextSegmentName
+  nextSegmentName     String? @map("NextSegmentName") @db.VarChar(100)    // NEW: Name-based target reference
+
+  // Scope enforcement
+  routingId           String  @map("RoutingId") @db.VarChar(150) // Scope: derived from source segment
+  changeSetId         String? @map("ChangeSetId") @db.UniqueIdentifier // Scope: derived from source segment
+
+  // Transition details
+  contextKey          String? @map("ContextKey") @db.VarChar(100) // Optional context for routing override
+  resultName          String  @map("ResultName") @db.VarChar(50)
+  params              String? @map("Params") @db.NVarChar(4000) // JSON
+  transitionOrder     Int?    @map("TransitionOrder") @db.Int // Display order for UI rendering (nullable for backward compatibility)
+
+  // Relations
+  segment     Segment  @relation("SegmentTransitions", fields: [segmentId], references: [segmentId], onDelete: Cascade)
+  nextSegment Segment? @relation("NextSegment", fields: [nextSegmentId], references: [segmentId], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([segmentId, resultName], name: "uq_transition_segment_result")
+  @@index([segmentId])
+  @@index([nextSegmentId])
+  @@index([routingId, changeSetId, sourceSegmentName], name: "ix_transition_source_name")
+  @@index([routingId, changeSetId, nextSegmentName], name: "ix_transition_target_name")
+  @@index([segmentId, contextKey], name: "ix_transition_contextkey")
+  @@index([segmentId, transitionOrder], name: "ix_transition_order")
+  @@schema("ivr")
+  @@map("seg_SegmentTransition")
+}
+
+/// UI state for flow designer (positions, collapse states)
+/// Stores per-segment visual settings that don't affect business logic
+/// One-to-one relation with Segment (CASCADE delete when segment deleted)
+model SegmentUIState {
+  segmentId   String   @id @map("SegmentId") @db.UniqueIdentifier
+  routingId   String   @map("RoutingId") @db.VarChar(150)
+  changeSetId String?  @map("ChangeSetId") @db.UniqueIdentifier
+  positionX   Int?     @map("PositionX")
+  positionY   Int?     @map("PositionY")
+  collapsed   Boolean  @default(false) @map("Collapsed")
+  uiSettings  String?  @map("UiSettings") @db.NVarChar(2000) // JSON for future extensions
+  dateUpdated DateTime @updatedAt @map("DateUpdated") @db.DateTime2
+
+  segment Segment @relation(fields: [segmentId], references: [segmentId], onDelete: Cascade)
+
+  @@index([routingId, changeSetId], name: "ix_ui_state_routing")
+  @@schema("ivr")
+  @@map("seg_SegmentUIState")
+}
+
+// ============================================================================
+// MESSAGE STORE SCHEMA (msg)
+// Version: 3.2.0 - Aligned with MESSAGE_STORE_ERD.md
+// Naming: Message (identity/pointer) + MessageVersion (versioned content)
+// ============================================================================
+
+/// Dictionary: Message types (tts, audio_url, llm_message, llm_prompt, llm_dialog)
+model DicMessageType {
+  messageTypeId   Int      @id @default(autoincrement()) @map("MessageTypeId")
+  code            String   @unique @map("Code") @db.VarChar(20)
+  displayName     String   @map("DisplayName") @db.NVarChar(64)
+  description     String?  @map("Description") @db.NVarChar(256)
+  settingsSchema  String?  @map("SettingsSchema") @db.NVarChar(Max) // JSON Schema - NVARCHAR(MAX) per ERD
+  defaultSettings String?  @map("DefaultSettings") @db.NVarChar(Max) // Default JSON - NVARCHAR(MAX) per ERD
+  sortOrder       Int      @default(0) @map("SortOrder")
+  isActive        Boolean  @default(true) @map("IsActive")
+  dateCreated     DateTime @default(now()) @map("DateCreated") @db.DateTime2
+
+  messageKeys MessageKey[]
+
+  @@schema("ivr")
+  @@map("msg_Dic_MessageType")
+}
+
+/// Dictionary: Message categories (welcome, menu, identification, llm_system, etc.)
+model DicMessageCategory {
+  categoryId  Int      @id @default(autoincrement()) @map("CategoryId")
+  code        String   @unique @map("Code") @db.VarChar(32)
+  displayName String   @map("DisplayName") @db.NVarChar(64)
+  description String?  @map("Description") @db.NVarChar(256)
+  icon        String?  @map("Icon") @db.NVarChar(32)
+  color       String?  @map("Color") @db.Char(7) // Hex color: #FF5733
+  sortOrder   Int      @default(0) @map("SortOrder")
+  isActive    Boolean  @default(true) @map("IsActive")
+  dateCreated DateTime @default(now()) @map("DateCreated") @db.DateTime2
+
+  messageKeys MessageKey[]
+
+  @@schema("ivr")
+  @@map("msg_Dic_MessageCategory")
+}
+
+/// Dictionary: TTS voices per engine and language
+model DicVoice {
+  voiceId     Int      @id @default(autoincrement()) @map("VoiceId")
+  code        String   @unique @map("Code") @db.VarChar(64)
+  engine      String   @map("Engine") @db.VarChar(20) // google, azure, amazon, elevenlabs
+  language    String   @map("Language") @db.VarChar(10) // nl-BE, fr-BE (BCP47)
+  displayName String   @map("DisplayName") @db.NVarChar(128)
+  gender      String?  @map("Gender") @db.VarChar(10) // female, male, neutral
+  style       String?  @map("Style") @db.VarChar(32) // standard, wavenet, neural
+  sampleUrl   String?  @map("SampleUrl") @db.VarChar(256)
+  sortOrder   Int      @default(0) @map("SortOrder")
+  isActive    Boolean  @default(true) @map("IsActive")
+  dateCreated DateTime @default(now()) @map("DateCreated") @db.DateTime2
+
+  voiceConfigs MessageStoreVoiceConfig[]
+  languageRef  DicLanguage               @relation(fields: [language], references: [languageCode])
+
+  @@index([engine, language], name: "ix_voice_engine_lang")
+  @@schema("ivr")
+  @@map("cfg_Dic_Voice")
+}
+
+/// Message store: Container for messages per customer+project
+/// Note: Multiple stores allowed per company+project (no unique constraint)
+model MessageStore {
+  messageStoreId   Int      @id @default(autoincrement()) @map("MessageStoreId")
+  companyProjectId Int      @map("DicCompanyProjectId")
+  name             String   @map("Name") @db.NVarChar(128)
+  description      String?  @map("Description") @db.NVarChar(512)
+  allowedLanguages String   @default("[]") @map("AllowedLanguages") @db.NVarChar(200) // JSON array - smaller per ERD
+  defaultLanguage  String?  @map("DefaultLanguage") @db.VarChar(10)
+  isActive         Boolean  @default(true) @map("IsActive")
+  dateCreated      DateTime @default(now()) @map("DateCreated") @db.DateTime2
+  createdBy        String?  @map("CreatedBy") @db.VarChar(100)
+  dateUpdated      DateTime @updatedAt @map("DateUpdated") @db.DateTime2
+  updatedBy        String?  @map("UpdatedBy") @db.VarChar(100)
+
+  // Relations
+  companyProject     DicCompanyProject         @relation(fields: [companyProjectId], references: [companyProjectId])
+  defaultLanguageRef DicLanguage?              @relation("MessageStoreDefaultLanguage", fields: [defaultLanguage], references: [languageCode], onDelete: NoAction, onUpdate: NoAction)
+  voiceConfigs       MessageStoreVoiceConfig[]
+  messageKeys        MessageKey[]
+  routingTables      RoutingTable[]
+
+  @@index([companyProjectId], name: "ix_messagestore_companyproject")
+  @@index([isActive], name: "ix_messagestore_active")
+  @@schema("ivr")
+  @@map("msg_MessageStore")
+}
+
+/// Message store voice config: Voice settings per store and language
+model MessageStoreVoiceConfig {
+  configId       Int     @id @default(autoincrement()) @map("ConfigId")
+  messageStoreId Int     @map("MessageStoreId")
+  language       String  @map("Language") @db.VarChar(10)
+  voiceId        Int     @map("DicVoiceId")
+  isDefault      Boolean @default(false) @map("IsDefault")
+  sortOrder      Int     @default(0) @map("SortOrder")
+
+  messageStore MessageStore @relation(fields: [messageStoreId], references: [messageStoreId], onDelete: Cascade)
+  voice        DicVoice     @relation(fields: [voiceId], references: [voiceId], onDelete: NoAction, onUpdate: NoAction)
+  languageRef  DicLanguage  @relation(fields: [language], references: [languageCode], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([messageStoreId, language, voiceId], name: "uq_voiceconfig_store_lang_voice")
+  @@index([messageStoreId, language], name: "ix_voiceconfig_store_lang")
+  @@schema("ivr")
+  @@map("msg_MessageStoreVoiceConfig")
+}
+
+// ============================================================================
+// MESSAGE STORE SCHEMA v5.0.0 - MessageKey-Level Versioning
+// New versioning model: MessageKey → MessageKeyVersion → MessageLanguageContent
+// ============================================================================
+
+/// MessageKey: Identity table (one per messageKey in store)
+/// Replaces per-language Message records with unified messageKey identity
+model MessageKey {
+  messageKeyId     Int      @id @default(autoincrement()) @map("MessageKeyId")
+  messageStoreId   Int      @map("MessageStoreId")
+  messageKey       String   @map("MessageKey") @db.VarChar(64) // UPPER_SNAKE_CASE
+  messageTypeId    Int      @map("DicMessageTypeId")
+  categoryId       Int      @map("DicMessageCategoryId")
+  publishedVersion Int?     @map("PublishedVersion") // Currently published version (NULL = no published)
+  displayName      String?  @map("DisplayName") @db.NVarChar(128)
+  description      String?  @map("Description") @db.NVarChar(512)
+  dateCreated      DateTime @default(now()) @map("DateCreated") @db.DateTime2
+  createdBy        String?  @map("CreatedBy") @db.VarChar(100)
+  dateUpdated      DateTime @updatedAt @map("DateUpdated") @db.DateTime2
+  updatedBy        String?  @map("UpdatedBy") @db.VarChar(100)
+
+  messageStore MessageStore       @relation(fields: [messageStoreId], references: [messageStoreId], onDelete: Cascade)
+  messageType  DicMessageType     @relation(fields: [messageTypeId], references: [messageTypeId])
+  category     DicMessageCategory @relation(fields: [categoryId], references: [categoryId])
+  versions     MessageKeyVersion[]
+
+  @@unique([messageStoreId, messageKey], name: "uq_mk_store_key")
+  @@index([messageStoreId], name: "ix_mk_store")
+  @@index([categoryId], name: "ix_mk_category")
+  @@index([messageTypeId], name: "ix_mk_type")
+  @@schema("ivr")
+  @@map("msg_MessageKey")
+}
+
+/// MessageKeyVersion: Version container (groups all languages for a version)
+/// One version contains all language translations atomically
+model MessageKeyVersion {
+  messageKeyVersionId String   @id @default(dbgenerated("NEWID()")) @map("MessageKeyVersionId") @db.UniqueIdentifier
+  messageKeyId        Int      @map("MessageKeyId")
+  version             Int      @map("Version") // 1-10
+  versionName         String?  @map("VersionName") @db.NVarChar(128) // "Q1 2024 Release"
+  isActive            Boolean  @default(true) @map("IsActive")
+  dateCreated         DateTime @default(now()) @map("DateCreated") @db.DateTime2
+  createdBy           String?  @map("CreatedBy") @db.VarChar(100)
+
+  messageKey MessageKey               @relation(fields: [messageKeyId], references: [messageKeyId], onDelete: Cascade)
+  languages  MessageLanguageContent[]
+
+  @@unique([messageKeyId, version], name: "uq_mkv_version")
+  @@index([messageKeyId], name: "ix_mkv_key")
+  @@schema("ivr")
+  @@map("msg_MessageKeyVersion")
+}
+
+/// MessageLanguageContent: Language content within a version
+/// Each version contains content for all languages
+model MessageLanguageContent {
+  messageLanguageContentId Int      @id @default(autoincrement()) @map("MessageLanguageContentId")
+  messageKeyVersionId      String   @map("MessageKeyVersionId") @db.UniqueIdentifier
+  language                 String   @map("Language") @db.VarChar(10) // BCP47
+  content                  String   @map("Content") @db.NVarChar(Max)
+  typeSettings             String?  @map("TypeSettings") @db.NVarChar(Max) // JSON
+  dateCreated              DateTime @default(now()) @map("DateCreated") @db.DateTime2
+  createdBy                String?  @map("CreatedBy") @db.VarChar(100)
+  dateUpdated              DateTime @updatedAt @map("DateUpdated") @db.DateTime2
+  updatedBy                String?  @map("UpdatedBy") @db.VarChar(100)
+
+  version     MessageKeyVersion @relation(fields: [messageKeyVersionId], references: [messageKeyVersionId], onDelete: Cascade)
+  languageRef DicLanguage       @relation(fields: [language], references: [languageCode])
+
+  @@unique([messageKeyVersionId, language], name: "uq_mlc_version_lang")
+  @@index([messageKeyVersionId], name: "ix_mlc_version")
+  @@schema("ivr")
+  @@map("msg_MessageLanguageContent")
+}
+
+/// MessageKeyAudit: Audit trail for messageKey lifecycle
+/// NOTE: No FK to MessageKey/MessageKeyVersion - intentional for audit retention
+/// Audit records must persist after message deletion for compliance requirements
+model MessageKeyAudit {
+  auditId             String   @id @default(dbgenerated("NEWID()")) @map("AuditId") @db.UniqueIdentifier
+  messageKeyId        Int      @map("MessageKeyId") // No FK - audit retention after deletion
+  messageKeyVersionId String?  @map("MessageKeyVersionId") @db.UniqueIdentifier // Version involved (if applicable)
+  action              String   @map("Action") @db.VarChar(20) // created, edited, published, rollback, deleted, language_added, imported
+  actionBy            String   @map("ActionBy") @db.VarChar(100)
+  actionReason        String?  @map("ActionReason") @db.NVarChar(500)
+  auditData           String?  @map("AuditData") @db.NVarChar(Max) // JSON with before/after snapshots
+  dateAction          DateTime @default(now()) @map("DateAction") @db.DateTime2
+
+  @@index([messageKeyId], name: "ix_mka_key")
+  @@index([messageKeyVersionId], name: "ix_mka_version")
+  @@index([dateAction], name: "ix_mka_date")
+  @@index([action], name: "ix_mka_action")
+  @@schema("ivr")
+  @@map("msg_MessageKeyAudit")
+}
+
+// ============================================================================
+// SYSTEM AUDIT SCHEMA (sys)
+// ============================================================================
+
+/// System-wide audit log for all write operations
+/// Provides comprehensive audit trail for compliance and security
+model sys_AuditLog {
+  auditLogId     String   @id @default(dbgenerated("NEWID()")) @map("AuditLogId") @db.UniqueIdentifier
+  userId         String   @map("UserId") @db.VarChar(100)
+  userEmail      String   @map("UserEmail") @db.VarChar(256)
+  action         String   @map("Action") @db.VarChar(256)
+  entityType     String   @map("EntityType") @db.VarChar(100)
+  entityId       String?  @map("EntityId") @db.VarChar(150)
+  timestamp      DateTime @default(now()) @map("Timestamp") @db.DateTime2
+  duration       Int?     @map("Duration")
+  ipAddress      String?  @map("IpAddress") @db.VarChar(45) // IPv6 max length
+  userAgent      String?  @map("UserAgent") @db.NVarChar(512)
+  requestBody    String?  @map("RequestBody") @db.NVarChar(Max)
+  responseStatus String   @map("ResponseStatus") @db.VarChar(20)
+  errorMessage   String?  @map("ErrorMessage") @db.NVarChar(Max)
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([timestamp])
+  @@schema("ivr")
+  @@map("sys_AuditLog")
+}

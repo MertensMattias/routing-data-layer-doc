@@ -1,0 +1,690 @@
+---
+description: "Routing Data Layer - Core enforcement rules for documentation, agent selection, memory usage, and change tracking"
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# Cursor Rules - Routing Data Layer
+
+**Version**: 2.0.0
+**Last Updated**: 2025-12-22
+**Status**: Active
+
+**Note**: This file is the **single source of truth** for enforcement rules. Other files (AGENTS.md, CLAUDE.md) reference these rules but do not duplicate them.
+
+---
+
+## CRITICAL ENFORCEMENT RULES - READ FIRST
+
+**These rules MUST be followed for EVERY task. No exceptions.**
+
+### Rule Enforcement
+
+These rules are enforced through:
+1. **Code Review**: PR reviewers verify design docs updated and change history recorded
+2. **Self-Check**: Pre-commit checklist (see below) must be completed
+3. **Manual Review**: Periodic audit of AGENTS.md change history
+
+**Violations**: If rules are violated, PR will be blocked until compliance is achieved.
+
+### 1. Documentation Rules
+
+**Documentation Creation - STRICTLY FORBIDDEN:**
+
+- **NEVER** create .md files unless the user EXPLICITLY requests it in their message
+- **NEVER** create completion reports, status summaries, or progress documents
+- **NEVER** create new documentation files "for reference" or "for future use"
+- **NEVER** duplicate information that exists in AGENTS.md or existing design documents
+- **NEVER** create README.md, CHANGELOG.md, or similar files without explicit request
+- **NEVER** create documentation "to help future developers" or "for onboarding"
+
+**What IS Allowed (No Restrictions):**
+
+- **Code comments** - Inline comments, JSDoc, TypeDoc annotations (always allowed)
+- **Output files** - JSON, CSV, XML, YAML, SQL scripts from tools/agents (always allowed)
+- **Configuration files** - .json, .yaml, .toml config files (always allowed)
+- **Updating existing .md files** - When explicitly instructed or as part of mandatory design doc updates (see below)
+
+**What Counts as "Explicit Request":**
+
+✅ **EXPLICIT** (allowed):
+- "Create a README.md file"
+- "Document this in a new file"
+- "Write the report to `docs/report.md`"
+- "Generate documentation at `path/to/file.md`"
+- "Create a guide for X and save it as Y.md"
+
+❌ **NOT EXPLICIT** (forbidden):
+- "This should be documented" (implies but doesn't request)
+- "We need docs for this" (statement, not request)
+- "Documentation would be helpful" (suggestion, not request)
+- "Can you document this?" (ambiguous - ask for clarification)
+
+**If you think documentation is needed:**
+
+1. **STOP** - Do not create it
+2. **ASK** the user first: "Should I create [filename].md for [purpose]?"
+3. **WAIT** - for explicit approval before creating
+4. **If user says "yes" or "go ahead"** - That counts as explicit approval, proceed
+
+**Documentation Maintenance (Existing Files):**
+
+- **Updating existing .md files** is allowed when:
+  - User explicitly asks to update a specific file
+  - Part of mandatory design document updates (see below)
+  - Fixing typos, broken links, or factual errors in existing docs
+- **DO NOT** proactively update existing docs "to keep them current" without explicit request
+- **DO NOT** refactor or reorganize existing documentation without explicit request
+
+**Service Document Updates (only for ACTUAL design changes, AFTER changes complete):**
+
+**When to Update (MANDATORY):**
+
+- **message-store design changes** → Update `docs/design/message-store/DESIGN.md`, `FINAL_DESIGN_WITH_POINTER.md`, `MESSAGE_STORE_ERD.md`
+- **routing-table design changes** → Update `docs/design/routing-table/DESIGN.md`, `ROUTING_TABLE_ERD.md`
+- **segment-store design changes** → Update `docs/design/segment-store/DESIGN.md`, `SEGMENT_STORE_ERD.md`
+- **Schema changes** → Also update `services/backend/prisma/COMPLETE_DATABASE_SCHEMA.sql`
+
+**Update Workflow:**
+
+1. **Make code changes first** (schema, API, data models)
+2. **Then update design docs** in the same commit/session
+3. **Commit together** - Code changes and design doc updates should be in the same commit
+4. **Verify accuracy** - Ensure design docs reflect actual implementation
+
+**DO NOT** update design documents for:
+- Bug fixes that don't change design
+- Code refactoring that doesn't change interfaces
+- Test updates
+- Documentation-only changes
+- Performance optimizations that don't affect design
+
+**Global Architecture Updates:**
+
+- **GLOBAL changes** (infrastructure, database setup, deployment, technology stack) → Update `docs/GLOBAL_ARCHITECTURE.md`
+- **Timing**: Update in the same commit as code changes, before marking PR as ready for review
+- **Examples**: switching database providers, adding Docker services, changing deployment strategy, updating technology stack
+
+**UI/UX Design:**
+
+- **UI/UX changes** (new requirements, change requests, feature additions, design updates, component changes, layout modifications, interaction patterns) → Update `docs/UI_DESIGN.md`
+- **MANDATORY**: Agents MUST keep `docs/UI_DESIGN.md` up to date with current state and planned changes
+- **Document Structure Requirements**:
+  - **Current Design State**: Document the UI/UX design as it currently exists (components, layouts, interactions, patterns)
+  - **New Requirements/Change Requests**: When new UI requirements or change requests are received, FIRST document them in `docs/UI_DESIGN.md` before implementation
+  - **Features to Add**: Maintain a section listing planned features and UI enhancements
+  - **Change History**: Track UI/UX changes with timestamps and descriptions
+- **Timing**:
+  - **New Requirements**: Document FIRST before starting implementation
+  - **Design Changes**: Update in the same commit as code changes, before marking PR as ready for review
+- **Examples**:
+  - New UI components or pages
+  - Layout changes or responsive design updates
+  - Interaction pattern changes (navigation, forms, modals)
+  - Design system updates (colors, typography, spacing)
+  - Accessibility improvements
+  - User flow modifications
+  - Feature additions requiring UI changes
+
+
+### 2. Agent Selection Rules
+
+**Available Agents (13 total):**
+
+#### Core Pipeline Agents (5)
+- **architect**: Design approval, cross-module decisions, architecture validation
+- **developer**: Full-stack TypeScript implementation
+- **code-reviewer**: TypeScript/NestJS/Next.js quality gate
+- **test-runner**: Jest execution, coverage validation
+- **debugger**: Bug diagnosis, root cause analysis
+
+#### Specialty Agents (8)
+- **security-scanner**: Vulnerability scanning, OWASP compliance, secret detection
+- **requirements-analyst**: Codebase analysis, tech debt identification, requirements extraction
+- **system-architect-2025**: Modern architecture design, scalability planning, cloud-native patterns
+- **design-director-platform**: Comprehensive platform redesigns, UX/accessibility/conversion optimization
+- **design-system-architect**: Design systems, tokens, components, adaptive interfaces
+- **interaction-design-optimizer**: UX flow optimization, micro-interactions, conversion improvement
+- **doc-writer**: Documentation creation, API docs, guides
+- **refactor**: Code modernization, design patterns, technical debt reduction
+
+**Agent Selection Decision Tree:**
+
+```
+Is this a SECURITY-CRITICAL feature?
+  ├─ YES → Use SECURITY_ARCHITECTURE_WORKFLOW
+  │         (security-scanner → system-architect → architect → developer → ...)
+  │
+Is this a MAJOR PLATFORM REDESIGN?
+  ├─ YES → Use PLATFORM_REDESIGN_WORKFLOW
+  │         (design-director → designers → developers)
+  │
+Is this a DESIGN SYSTEM or UI COMPONENTS?
+  ├─ YES → Use DESIGN_SYSTEM_WORKFLOW
+  │         (design-system-architect → developer → ...)
+  │
+Is this a LARGE ARCHITECTURE CHANGE?
+  ├─ YES → Use ARCHITECTURE_REDESIGN_WORKFLOW
+  │         (requirements-analyst → system-architect → architect → developer → ...)
+  │
+Is this a TECHNICAL DEBT / CODE MODERNIZATION?
+  ├─ YES → Use MODERNIZATION_WORKFLOW
+  │         (requirements-analyst → refactor → developer → ...)
+  │
+Otherwise → Use FEATURE_WORKFLOW (core agents only)
+            (architect → developer → code-reviewer → test-runner)
+```
+
+**When to Invoke Specialty Agents:**
+
+| Situation | Agent | Trigger |
+|-----------|-------|---------|
+| Auth/data handling/compliance | security-scanner | Before development |
+| New architecture or scalability | system-architect-2025 | Early planning |
+| UX/accessibility/conversion | design-director-platform | For platform redesigns |
+| Design tokens/components | design-system-architect | New UI systems |
+| UX flow optimization | interaction-design-optimizer | Conversion focus |
+| Code cleanup/modernization | requirements-analyst + refactor | Tech debt reduction |
+| Documentation creation | doc-writer | For API/guide docs |
+| Bug investigation | debugger | When tests fail |
+
+**Workflow Templates:**
+All workflows are documented in `.claude/agents/WORKFLOW_TEMPLATES/`:
+- `SECURITY_ARCHITECTURE_WORKFLOW.md` - Auth/security features
+- `PLATFORM_REDESIGN_WORKFLOW.md` - Major UX redesigns
+- `DESIGN_SYSTEM_WORKFLOW.md` - UI system work
+- `ARCHITECTURE_REDESIGN_WORKFLOW.md` - System-wide changes
+- `MODERNIZATION_WORKFLOW.md` - Tech debt reduction
+
+---
+
+### 2.5 RBAC Implementation Rules
+
+**When implementing authentication/authorization features:**
+
+1. **Always use granular domain-specific roles** - NOT simple VIEWER/EDITOR/OPS/ADMIN
+2. **Enforce customer scoping** - Users should only see data for customers they have access to
+3. **Two-level authorization** - Check BOTH domain role AND customer scope
+4. **Use @RequireCustomerScope()** - On all endpoints accessing customer-specific data
+5. **Reference permission matrix** - Check `services/backend/src/auth/roles.enum.ts` for allowed actions
+
+**RBAC Architecture:**
+
+- **Domain Roles**: `routing-table-*`, `message-store-*`, `segment-store-*`, `global-admin`, `global-dev`
+- **Customer Scopes**: `okta-{customerId}-flow` pattern
+- **Database Column**: `DicCompanyProject.oktaGroup` links customer to Okta group
+- **Guards**: `AuthGuard('azure-ad')` → `RoleGuard` (checks role + scope)
+- **Decorators**: `@Roles()` for domain permissions, `@RequireCustomerScope()` for visibility
+
+**Permission Patterns:**
+
+| Action | Viewer | Editor | OPS | Admin |
+|--------|--------|--------|-----|-------|
+| View (GET) | ✅ | ✅ | ✅ | ✅ |
+| Create/Edit | ❌ | ✅ | ❌ | ✅ |
+| Publish/Rollback | ❌ | ❌ | ✅ | ✅ |
+| Delete | ❌ | ❌ | ❌ | ✅ |
+| Manage Schema | ❌ | ❌ | ❌ | ✅ |
+
+**Global Roles:**
+- `global-admin`: Bypasses customer scope, full access everywhere
+- `global-dev`: Dev tooling access (debug views, hidden segments), read-only in production
+
+**See:** `services/backend/src/auth/README.md` for complete RBAC documentation
+
+---
+
+### 3. Memory Usage Rules
+
+**MCP Memory (Knowledge Graph) - When Required:**
+
+**Memory Usage - Decision Tree:**
+
+- ✅ **REQUIRED**: Architecture changes, design decisions, new patterns
+- ✅ **REQUIRED**: Cross-module integration, API contracts, schema changes
+- ✅ **REQUIRED**: New components, services, or significant features
+- ⚠️ **OPTIONAL**: Bug fixes, typo corrections, formatting changes
+- ⚠️ **OPTIONAL**: Simple refactoring that doesn't change interfaces
+
+**Rule of thumb**: If the change affects how other developers would understand the system, use memory.
+
+**Before tasks requiring memory:**
+
+1. `mcp_memory_read_graph()` - Get full context
+2. `mcp_memory_search_nodes(query)` - Search for relevant entities
+3. `mcp_memory_open_nodes([names])` - Get specific entity details
+
+**When thinking or looking for something:**
+
+1. `mcp_memory_search_nodes(query)` - Search for relevant entities and observations before making decisions
+2. `mcp_memory_open_nodes([names])` - Get specific entity details to avoid repeating work
+3. Use memory to check for existing patterns, decisions, and learnings before coding
+
+**After completing work:**
+
+1. `mcp_memory_add_observations()` - Add new learnings to existing entities
+2. `mcp_memory_create_entities()` - Create new entities if needed
+3. `mcp_memory_create_relations()` - Link entities (use active voice)
+
+**Timing for Memory Updates:**
+
+- **When thinking/planning**: Query memory first to understand context and avoid repeating past decisions
+- **During coding**: Don't update memory until work is complete
+- **After task completion**: Update memory once all code changes, document updates, and AGENTS.md entries are done
+
+**Memory maintenance rules:**
+
+- Store architectural decisions, patterns, and learnings as observations
+- Create entities for new components, APIs, or significant patterns
+- Use relations to track dependencies between components
+- Keep observations concise and factual
+- Delete outdated observations with `delete_observations()`
+
+**AGENTS.md Files (Documentation) - READ IN ORDER:**
+
+| Priority | File | Purpose | When to Read |
+|----------|------|---------|--------------|
+| 1 | `AGENTS.md` (root) | Global architecture & module structure | Every session |
+| 2 | Module `AGENTS.md` | Module-specific guidance | When working on routing-table/, segment-store/, or message-store/ |
+| 3 | Module `DESIGN.md` | Detailed architecture & data models | Before deep work on specific module |
+
+**Module AGENTS.md Locations:**
+
+- `services/backend/src/routing-table/AGENTS.md`
+- `services/backend/src/segment-store/AGENTS.md`
+- `services/backend/src/message-store/AGENTS.md`
+
+### 3. Change Tracking Rules
+
+**Structural Code Change Time Tracking - MANDATORY:**
+
+For **EVERY structural code change**, you **MUST** record:
+
+1. **Start time** (ISO 8601 format: `YYYY-MM-DDTHH:mm:ssZ`)
+2. **One sentence description** of the change
+
+**What Constitutes a "Structural Code Change":**
+
+- Creating new files (services, modules, controllers, components)
+- Deleting files
+- Modifying file structure (moving files, renaming directories)
+- Adding new dependencies or removing dependencies
+- Database schema changes (Prisma migrations, schema modifications)
+- Adding or removing major features/modules
+- Refactoring that changes module boundaries or interfaces
+
+**Where to Record:**
+
+- **In the appropriate AGENTS.md file** - This is the ONLY and REQUIRED location
+  - Root `AGENTS.md` for workspace-wide or cross-service changes
+  - Module `AGENTS.md` for changes within a specific module
+  - **MUST be placed at the end of the file in a "Change History" section**
+
+**Format for AGENTS.md:**
+
+```text
+## Change History
+
+- **YYYY-MM-DDTHH:mm:ssZ**: [One sentence description of the change]
+- **YYYY-MM-DDTHH:mm:ssZ**: [One sentence description of the change]
+```
+
+**Examples:**
+
+```text
+## Change History
+
+- **2025-12-22T10:30:00Z**: Added Okta OIDC integration with JWT validation
+- **2025-12-22T14:15:00Z**: Created audit logging interceptor for all write operations
+- **2025-12-22T16:45:00Z**: Refactored routing-table service to use new ChangeSet workflow pattern
+```
+
+**Edge Cases:**
+
+- **If Change History section doesn't exist**: Create it at the end of the file
+- **If change affects multiple modules**: Record in root AGENTS.md with comprehensive description, reference affected modules
+- **Multi-line descriptions**: Keep to one sentence if possible; if complex, use semicolons to separate key points
+
+**This rule applies to ALL structural changes. There are NO exceptions.**
+
+**Module AGENTS.md Update Rule:**
+
+- Only update module `AGENTS.md` for structural changes within that module
+- Do NOT update for patterns or learnings (those go in MCP Memory)
+- Module updates should only be in the Change History section with timestamp
+
+**Memory vs AGENTS.md Decision Tree:**
+
+- **Structural change** (new files, schema changes, module boundaries) → **AGENTS.md Change History**
+- **Pattern/decision/learning** (architectural decisions, implementation patterns) → **MCP Memory**
+- **Both** (structural change with new pattern) → **Both** (record in AGENTS.md, create Memory entity, reference from AGENTS.md)
+
+---
+
+## Session Start Protocol
+
+**EVERY session MUST begin with:**
+
+1. Read MCP Memory: `mcp_memory_read_graph()`
+2. Read root `AGENTS.md`
+3. If working on a module, read the module's `AGENTS.md` and `DESIGN.md`
+
+---
+
+## Task Completion Protocol
+
+**After EVERY task:**
+
+1. Update MCP Memory (add observations, create entities if needed)
+2. Update root `AGENTS.md` with change history entry (if structural change)
+3. Update module `AGENTS.md` with change history entry (if structural change within that module)
+4. **MANDATORY**: If you made ACTUAL design/schema changes, update service-specific design documents (see above) **AFTER** the changes are complete
+5. **MANDATORY**: If you made GLOBAL changes, update `docs/GLOBAL_ARCHITECTURE.md`
+
+**Timing Clarification:**
+
+- **"AFTER changes complete"** means: Update design docs in the same commit as code changes, before marking PR as ready for review
+- Design docs should be updated immediately after code changes, not in a separate PR
+- If changes span multiple commits, update design docs in the final commit that completes the change
+
+---
+
+## Edge Cases and Exceptions
+
+### New Module/Service
+
+- **If design doc doesn't exist**: Create it as part of initial implementation
+- **If AGENTS.md doesn't exist**: Create it with Change History section at the end
+- **If module folder doesn't exist**: Create folder structure first, then add AGENTS.md
+
+### Missing Files
+
+- **If MCP Memory unavailable**: Continue without memory, note exception in response
+- **If AGENTS.md missing Change History section**: Create section at end of file
+- **If design doc path doesn't match expected location**: Use closest matching path, or create new doc if appropriate
+
+### User Override
+
+- **If user explicitly asks to skip a rule**: Follow user instruction, note exception in response
+- **If user asks to create documentation**: Override prohibition, create as requested
+- **If user provides conflicting instruction**: User instruction takes precedence, but note the conflict
+
+### Cross-Module Changes
+
+- **If change affects multiple modules**: Update all affected DESIGN.md files
+- **Record in root AGENTS.md** with comprehensive description listing all affected modules
+- **Create Memory entities** for cross-module patterns or decisions
+
+### Shared/Common Code Changes
+
+- **If change is in shared types/utilities**: Update root AGENTS.md if structural, or MCP Memory if pattern
+- **If change affects API contracts in shared DTOs**: Update all module DESIGN.md files that use those DTOs
+- **If change is in infrastructure/config**: Update `docs/GLOBAL_ARCHITECTURE.md`
+
+### Design Document Deprecation
+
+- **If design doc is deprecated**: Add deprecation note with reason and date at top of file
+- **Keep file for reference** but mark clearly as deprecated
+- **Update references** in other docs to point to new location if applicable
+
+---
+
+## MANDATORY: Service-Specific Document Updates
+
+**CRITICAL RULE - NO EXCEPTIONS:**
+
+**IMPORTANT**: Only update design documents when there are **ACTUAL design/schema changes**. Update them **AFTER** making the changes, not before.
+
+### Documentation Source of Truth
+
+**Database Schema:**
+- **`services/backend/prisma/schema.prisma`** - Prisma schema definition (source of truth for ORM)
+- **`services/backend/prisma/COMPLETE_DATABASE_SCHEMA.sql`** - Complete SQL schema (single source of truth for table structures, columns, indexes, FKs)
+
+**Backend Service Documentation:**
+- **`docs/design/routing-table/DESIGN.md`** - Routing table module design, schema, API, patterns
+- **`docs/design/segment-store/DESIGN.md`** - Segment store module design, schema, API, patterns
+- **`docs/design/message-store/DESIGN.md`** - Message store module design, schema, API, patterns
+
+**Global Architecture & Design:**
+- **`docs/design/GLOBAL_ARCHITECTURE.md`** - General solution design, Auth/Roles, deployment, technology stack, cross-module patterns
+- **`docs/design/ui-design/GLOBAL_UI_DESIGN.md`** - Global UI design system, component library, design patterns, accessibility
+
+**Module-Specific ERDs:**
+- **`docs/design/routing-table/ROUTING_TABLE_ERD.md`** - Routing table entity relationships
+- **`docs/design/segment-store/SEGMENT_STORE_ERD.md`** - Segment store entity relationships
+- **`docs/design/message-store/MESSAGE_STORE_ERD.md`** - Message store entity relationships
+
+### When to Update Design Documents
+
+Update design documents **ONLY** when you make changes to:
+
+- Database schema (Prisma schema, table structures, FKs, constraints)
+- API contracts (endpoints, request/response DTOs, parameters)
+- Data models (entity structures, relationships)
+- Business logic patterns that affect the design
+
+**DO NOT** update design documents for:
+
+- Bug fixes that don't change design
+- Code refactoring that doesn't change interfaces
+- Test updates
+- Documentation-only changes
+
+### Message-Store Design Changes
+
+**If you make ACTUAL design/schema changes to message-store:**
+
+**MANDATORY UPDATES (after changes are complete):**
+
+1. **`docs/design/message-store/DESIGN.md`** - Update schema, DTOs, API examples, patterns
+2. **`docs/design/message-store/MESSAGE_STORE_ERD.md`** - Update if schema/relationships change
+3. **`services/backend/prisma/COMPLETE_DATABASE_SCHEMA.sql`** - Update table definitions, constraints, indexes (if schema changes)
+4. **`docs/design/message-store/FINAL_DESIGN_WITH_POINTER.md`** - Update if file exists; if deprecated, add deprecation note with reason and date
+
+**What to update:**
+
+- Table definitions (CREATE TABLE statements) in DESIGN.md and COMPLETE_DATABASE_SCHEMA.sql
+- Field types, constraints, FKs in all relevant docs
+- DTO examples (if API changes) in DESIGN.md
+- Service method signatures (if logic changes) in DESIGN.md
+- Entity relationship diagrams in ERD.md
+- Version numbers and change history in DESIGN.md
+
+### Routing-Table Design Changes
+
+**If you make ACTUAL design/schema changes to routing-table:**
+
+**MANDATORY UPDATES (after changes are complete):**
+
+1. **`docs/design/routing-table/DESIGN.md`** - Update schema, DTOs, API examples, patterns
+2. **`docs/design/routing-table/ROUTING_TABLE_ERD.md`** - Update if schema/relationships change
+3. **`services/backend/prisma/COMPLETE_DATABASE_SCHEMA.sql`** - Update table definitions, constraints, indexes (if schema changes)
+
+**What to update:**
+
+- Table definitions (CREATE TABLE statements) in DESIGN.md and COMPLETE_DATABASE_SCHEMA.sql
+- Field types, constraints, FKs in all relevant docs
+- DTO examples (if API changes) in DESIGN.md
+- Service method signatures (if logic changes) in DESIGN.md
+- Entity relationship diagrams in ERD.md
+- Version numbers and change history in DESIGN.md
+
+### Segment-Store Design Changes
+
+**If you make ACTUAL design/schema changes to segment-store:**
+
+**MANDATORY UPDATES (after changes are complete):**
+
+1. **`docs/design/segment-store/DESIGN.md`** - Update schema, DTOs, API examples, patterns
+2. **`docs/design/segment-store/SEGMENT_STORE_ERD.md`** - Update if schema/relationships change
+3. **`services/backend/prisma/COMPLETE_DATABASE_SCHEMA.sql`** - Update table definitions, constraints, indexes (if schema changes)
+
+**What to update:**
+
+- Table definitions (CREATE TABLE statements) in DESIGN.md and COMPLETE_DATABASE_SCHEMA.sql
+- Field types, constraints, FKs in all relevant docs
+- DTO examples (if API changes) in DESIGN.md
+- Service method signatures (if logic changes) in DESIGN.md
+- Entity relationship diagrams in ERD.md
+- Version numbers and change history in DESIGN.md
+
+### Cross-Service Design Changes
+
+**If design changes affect multiple services or shared Prisma schema:**
+
+**MANDATORY UPDATES (after changes are complete):**
+
+1. **ALL affected service DESIGN.md files** - Update each module's design document
+2. **`docs/design/GLOBAL_ARCHITECTURE.md`** - Update if architecture, Auth/Roles, deployment, or technology stack changes
+3. **`services/backend/prisma/COMPLETE_DATABASE_SCHEMA.sql`** - Update if schema changes (always update for schema changes)
+4. **Root `AGENTS.md`** - Record comprehensive change history with timestamp
+
+**Global Architecture Updates:**
+
+- **Infrastructure changes** (database setup, deployment, Docker) → Update `docs/design/GLOBAL_ARCHITECTURE.md`
+- **Auth/Roles changes** → Update `docs/design/GLOBAL_ARCHITECTURE.md` section 11 (Security)
+- **Technology stack changes** → Update `docs/design/GLOBAL_ARCHITECTURE.md` section 2 (Technology Stack)
+- **Cross-module patterns** → Update `docs/design/GLOBAL_ARCHITECTURE.md` relevant sections
+
+**UI/UX Design Updates:**
+
+- **UI/UX changes** (components, layouts, interactions) → Update `docs/design/ui-design/GLOBAL_UI_DESIGN.md`
+- **Design system changes** → Update `docs/design/ui-design/GLOBAL_UI_DESIGN.md` section 2 (Design System Foundation)
+- **Component library changes** → Update `docs/design/ui-design/GLOBAL_UI_DESIGN.md` section 9 (Component Library)
+
+---
+
+---
+
+## Language-Specific Coding Standards
+
+### TypeScript Requirements
+
+**CRITICAL: TypeScript strict mode is enabled - all code must be type-safe**
+
+**MANDATORY Rules:**
+- **NEVER use `any` type** - Use proper types or `unknown` with type guards
+- **Always type function parameters and return values**
+- **Use Prisma types** from generated client (`Prisma.*` types)
+- **Handle nullable/optional types explicitly** - Use `?.` and `??` operators
+- **Use type assertions sparingly** - Prefer type guards over assertions
+
+**Before committing:**
+- Run `npm run type-check` (frontend) or `tsc --noEmit` (backend)
+- Fix ALL TypeScript errors - no `@ts-ignore` without justification
+- No implicit `any` types allowed
+
+**Common errors to prevent:**
+- `TS2532: Object is possibly 'undefined'` → Use optional chaining (`?.`)
+- `TS2322: Type mismatch` → Use proper types from Prisma/DTOs
+- `TS7006: Parameter implicitly has 'any' type` → Add explicit types
+
+### SQL Requirements
+
+**CRITICAL: SQL migrations and queries must follow standards**
+
+**MANDATORY Rules:**
+- **Always use parameterized queries** (Prisma handles this)
+- **Use transactions for multi-step operations**
+- **SQL migrations must be idempotent** (check before creating)
+- **Always update COMPLETE_DATABASE_SCHEMA.sql** when schema changes
+
+**Naming Conventions:**
+- Tables: `SchemaPrefix_PascalCase` (e.g., `rt_RoutingTable`)
+- Columns: `PascalCase` (e.g., `RoutingId`, `CreatedAt`)
+- Indexes: `IX_TableName_ColumnName` or `UQ_TableName_ColumnName`
+- Foreign Keys: `FK_TableName_ReferencedTable`
+
+### JavaScript Requirements (Scripts Only)
+
+**Note: Most code is TypeScript. JavaScript only for legacy scripts or build tools.**
+
+**MANDATORY Rules:**
+- Use modern ES6+ features (const/let, arrow functions)
+- Always handle errors (try/catch blocks)
+- Use const/let, never var
+- Validate input parameters
+
+## Absolute Prohibitions - No Exceptions
+
+### Communication Style - Be Concise
+
+- Give **only relevant, actionable feedback**
+- Skip pleasantries and verbose explanations
+- Tell me: WHAT changed, WHY it matters, WHAT I need to know
+- If nothing important, say so in one sentence
+- Bullet points only for multi-step actions
+
+---
+
+## Pre-Commit Checklist - ENFORCE THESE RULES
+
+**Before completing ANY task, verify:**
+
+1. **Documentation Creation Check:**
+   - [ ] Did I create any .md files? → **STOP** - Only if user explicitly requested
+   - [ ] Did I include emoji/glyphs? → **REMOVE** them immediately
+   - [ ] Did I create status/completion reports? → **DELETE** them
+
+2. **Service Document Update Check (only if ACTUAL design changes):**
+   - [ ] Did I change database schema? → Update DESIGN.md, ERD.md, COMPLETE_DATABASE_SCHEMA.sql (after changes)
+   - [ ] Did I change API contracts/DTOs? → Update DESIGN.md (after changes)
+   - [ ] Did I change data models? → Update DESIGN.md, ERD.md (after changes)
+   - [ ] Did I change Auth/Roles? → Update GLOBAL_ARCHITECTURE.md section 11 (after changes)
+   - [ ] Did I change UI/UX design? → Update GLOBAL_UI_DESIGN.md (after changes)
+   - [ ] Did I change global architecture? → Update GLOBAL_ARCHITECTURE.md (after changes)
+   - [ ] Did I make bug fixes/refactoring only? → NO design doc updates needed
+
+3. **Change History Check:**
+   - [ ] Did I make structural changes? → Record in AGENTS.md with timestamp
+   - [ ] Did I modify module code? → Record in module AGENTS.md
+
+4. **Global Architecture Check:**
+   - [ ] Did I make GLOBAL changes (infrastructure, database setup, deployment, technology stack)? → Update `docs/GLOBAL_ARCHITECTURE.md`
+   - [ ] Examples of global changes: switching database providers, adding Docker services, changing deployment strategy, updating technology stack
+
+5. **Memory Update Check:**
+   - [ ] Did I learn something new? → Add to MCP memory
+   - [ ] Did I create new patterns? → Create memory entities
+
+---
+
+## Enforcement Summary
+
+**CRITICAL RULES - NO EXCEPTIONS:**
+
+1. **Documentation Creation:**
+   - NEVER create .md files unless user EXPLICITLY requests it
+   - If unsure, ASK - do not assume
+   - Violation is a critical error
+
+2. **Service Document Updates (only for ACTUAL design changes, AFTER changes complete):**
+   - message-store design changes → Update DESIGN.md, MESSAGE_STORE_ERD.md, COMPLETE_DATABASE_SCHEMA.sql
+   - routing-table design changes → Update DESIGN.md, ROUTING_TABLE_ERD.md, COMPLETE_DATABASE_SCHEMA.sql
+   - segment-store design changes → Update DESIGN.md, SEGMENT_STORE_ERD.md, COMPLETE_DATABASE_SCHEMA.sql
+   - Schema changes → **ALWAYS** update COMPLETE_DATABASE_SCHEMA.sql (single source of truth)
+   - Auth/Roles changes → Update GLOBAL_ARCHITECTURE.md section 11
+   - UI/UX changes → Update GLOBAL_UI_DESIGN.md
+   - Global architecture changes → Update GLOBAL_ARCHITECTURE.md
+
+3. **Change Tracking:**
+   - ALL structural changes → Record in AGENTS.md with timestamp
+   - Module changes → Record in module AGENTS.md
+   - GLOBAL changes (infrastructure, database, deployment, tech stack) → Update GLOBAL_ARCHITECTURE.md
+
+4. **Memory Maintenance:**
+   - Before thinking/planning → Query memory to understand context
+   - After every task → Update MCP memory
+   - New patterns → Create entities and relations
+
+**Your job: code, maintain AGENTS.md, update design docs, update MCP memory. NOT create documentation libraries.**
+
+---
+
+## Rules Change History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 2.0.0 | 2025-12-22 | Added versioning, edge cases section, clarified memory usage, added enforcement notes, improved change history format |
+| 1.0.0 | 2025-12-XX | Initial rules file created |

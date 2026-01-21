@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intent Segment with contextKey (Phase 2)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: #f5f6fa;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 30px;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 1fr 450px;
+            gap: 20px;
+        }
+
+        .canvas {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 40px;
+            position: relative;
+            min-height: 700px;
+        }
+
+        .side-panel {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 24px;
+            overflow-y: auto;
+            max-height: 700px;
+        }
+
+        .instructions {
+            background: #e8f4f8;
+            border-left: 4px solid #3498db;
+            padding: 16px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .instructions h3 {
+            color: #2c3e50;
+            font-size: 14px;
+            margin: 0 0 8px 0;
+        }
+
+        .instructions p {
+            color: #5d6d7e;
+            font-size: 13px;
+            line-height: 1.6;
+            margin: 4px 0;
+        }
+
+        code {
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            color: #e67e22;
+            font-weight: 600;
+        }
+
+        /* Nodes */
+        .node {
+            border: 2px solid;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            position: absolute;
+            transition: all 0.2s;
+        }
+
+        .node:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transform: translateY(-2px);
+        }
+
+        .node.standard {
+            border-color: #3498db;
+        }
+
+        .node.intent {
+            border-color: #9b59b6;
+        }
+
+        .node.target {
+            border-color: #27ae60;
+        }
+
+        .node-header {
+            background: #3498db;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 6px 6px 0 0;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .node-header.intent {
+            background: #9b59b6;
+        }
+
+        .node-header.target {
+            background: #27ae60;
+        }
+
+        .node-type {
+            font-size: 11px;
+            opacity: 0.9;
+            margin-top: 2px;
+        }
+
+        .node-body {
+            padding: 16px;
+        }
+
+        .transition-group {
+            margin-bottom: 12px;
+        }
+
+        .transition-item {
+            padding: 10px 12px;
+            margin: 6px 0;
+            border-radius: 6px;
+            background: #f8f9fa;
+            border-left: 3px solid #3498db;
+            transition: all 0.2s;
+        }
+
+        .transition-item:hover {
+            background: #e9ecef;
+            transform: translateX(4px);
+        }
+
+        .transition-item.has-context {
+            border-left-color: #f39c12;
+            background: linear-gradient(90deg, #fffbf0 0%, #f8f9fa 100%);
+        }
+
+        .transition-item.has-context:hover {
+            background: linear-gradient(90deg, #fff5e6 0%, #e9ecef 100%);
+        }
+
+        .transition-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .transition-result {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+
+        .transition-target {
+            color: #7f8c8d;
+            font-size: 12px;
+        }
+
+        .context-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: #f39c12;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .context-info {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #e67e22;
+            margin-top: 4px;
+            font-weight: 600;
+        }
+
+        .arrow {
+            color: #95a5a6;
+            font-size: 12px;
+        }
+
+        /* Connection lines */
+        .connection-line {
+            stroke-width: 2.5;
+            fill: none;
+            opacity: 0.8;
+        }
+
+        .connection-line.standard {
+            stroke: #3498db;
+        }
+
+        .connection-line.context {
+            stroke: #f39c12;
+        }
+
+        .connection-arrow {
+            opacity: 0.8;
+        }
+
+        .connection-arrow.standard {
+            fill: #3498db;
+        }
+
+        .connection-arrow.context {
+            fill: #f39c12;
+        }
+
+        /* Edge labels */
+        .edge-label {
+            position: absolute;
+            background: white;
+            border: 2px solid;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        .edge-label.standard {
+            border-color: #3498db;
+            color: #3498db;
+        }
+
+        .edge-label.context {
+            border-color: #f39c12;
+            color: #f39c12;
+            background: #fffbf0;
+        }
+
+        /* Side panel */
+        .side-panel h2 {
+            font-size: 18px;
+            color: #2c3e50;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .side-panel h3 {
+            font-size: 14px;
+            color: #7f8c8d;
+            margin: 20px 0 12px 0;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+        }
+
+        .info-box.warning {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+        }
+
+        .info-box-title {
+            font-weight: 600;
+            font-size: 13px;
+            color: #2c3e50;
+            margin-bottom: 6px;
+        }
+
+        .info-box-text {
+            font-size: 12px;
+            color: #5d6d7e;
+            line-height: 1.5;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-bottom: 16px;
+        }
+
+        .comparison-table th {
+            background: #ecf0f1;
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+            color: #2c3e50;
+            border-bottom: 2px solid #bdc3c7;
+        }
+
+        .comparison-table td {
+            padding: 10px;
+            border-bottom: 1px solid #ecf0f1;
+            color: #5d6d7e;
+        }
+
+        .comparison-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .json-example {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+        }
+
+        .json-example pre {
+            margin: 0;
+            line-height: 1.6;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Intent Segment with contextKey (Phase 2 Implementation)</h1>
+        <p class="subtitle">Simple contextKey as metadata for tracking which context influenced routing</p>
+
+        <div class="instructions">
+            <h3>💡 Current Implementation (Phase 2):</h3>
+            <p><code>contextKey</code> is a <strong>string field</strong> on transitions that stores metadata about which context variable influenced the routing decision.</p>
+            <p>It's used for <strong>tracking and logging</strong>, not for making routing decisions.</p>
+            <p>Multiple transitions can use the <strong>same contextKey</strong> (e.g., PREMIUM and STANDARD both setting "customerType").</p>
+        </div>
+
+        <div class="layout">
+            <!-- Main Canvas -->
+            <div class="canvas">
+                <svg width="100%" height="700" style="position: absolute; top: 0; left: 0; pointer-events: none;">
+                    <defs>
+                        <marker id="arrow-std" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                            <polygon points="0 0, 10 3, 0 6" class="connection-arrow standard" />
+                        </marker>
+                        <marker id="arrow-ctx" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                            <polygon points="0 0, 10 3, 0 6" class="connection-arrow context" />
+                        </marker>
+                    </defs>
+
+                    <!-- Start to Intent Router -->
+                    <path d="M 210 100 L 210 200" class="connection-line standard" marker-end="url(#arrow-std)"/>
+
+                    <!-- Intent Router to targets with contextKey (orange) -->
+                    <path d="M 310 280 L 550 280" class="connection-line context" marker-end="url(#arrow-ctx)"/>
+                    <path d="M 310 340 L 550 380" class="connection-line context" marker-end="url(#arrow-ctx)"/>
+                    
+                    <!-- Intent Router to target without contextKey (blue) -->
+                    <path d="M 310 400 L 550 480" class="connection-line standard" marker-end="url(#arrow-std)"/>
+                </svg>
+
+                <!-- Edge Labels -->
+                <div class="edge-label context" style="left: 390px; top: 265px;">
+                    PREMIUM
+                    <div style="font-size: 9px; margin-top: 2px; opacity: 0.8;">ctx: customerType</div>
+                </div>
+                <div class="edge-label context" style="left: 390px; top: 345px;">
+                    STANDARD
+                    <div style="font-size: 9px; margin-top: 2px; opacity: 0.8;">ctx: customerType</div>
+                </div>
+                <div class="edge-label standard" style="left: 390px; top: 425px;">
+                    BASIC
+                </div>
+
+                <!-- Node 1: Start -->
+                <div class="node standard" style="left: 120px; top: 30px; width: 180px;">
+                    <div class="node-header">
+                        <div>Start</div>
+                        <div class="node-type">get_language</div>
+                    </div>
+                </div>
+
+                <!-- Node 2: Intent Router -->
+                <div class="node intent" style="left: 80px; top: 200px; width: 220px;">
+                    <div class="node-header intent">
+                        <div>Intent Router</div>
+                        <div class="node-type">intent</div>
+                    </div>
+                    <div class="node-body">
+                        <div class="transition-group">
+                            <div class="transition-item has-context">
+                                <div class="transition-header">
+                                    <span class="transition-result">PREMIUM</span>
+                                    <span class="context-badge">📊 ctx</span>
+                                </div>
+                                <div class="transition-target">
+                                    <span class="arrow">→</span> Premium Flow
+                                </div>
+                                <div class="context-info">
+                                    🔑 customerType
+                                </div>
+                            </div>
+
+                            <div class="transition-item has-context">
+                                <div class="transition-header">
+                                    <span class="transition-result">STANDARD</span>
+                                    <span class="context-badge">📊 ctx</span>
+                                </div>
+                                <div class="transition-target">
+                                    <span class="arrow">→</span> Standard Flow
+                                </div>
+                                <div class="context-info">
+                                    🔑 customerType
+                                </div>
+                            </div>
+
+                            <div class="transition-item">
+                                <div class="transition-header">
+                                    <span class="transition-result">BASIC</span>
+                                </div>
+                                <div class="transition-target">
+                                    <span class="arrow">→</span> Basic Flow
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Target Nodes -->
+                <div class="node target" style="left: 550px; top: 250px; width: 160px;">
+                    <div class="node-header target">
+                        <div>Premium Flow</div>
+                        <div class="node-type">menu</div>
+                    </div>
+                </div>
+
+                <div class="node target" style="left: 550px; top: 350px; width: 160px;">
+                    <div class="node-header target">
+                        <div>Standard Flow</div>
+                        <div class="node-type">menu</div>
+                    </div>
+                </div>
+
+                <div class="node target" style="left: 550px; top: 450px; width: 160px;">
+                    <div class="node-header target">
+                        <div>Basic Flow</div>
+                        <div class="node-type">menu</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Side Panel -->
+            <div class="side-panel">
+                <h2>
+                    <span>📊</span>
+                    Simple contextKey
+                </h2>
+
+                <div class="info-box">
+                    <div class="info-box-title">✅ Phase 2 Implementation</div>
+                    <div class="info-box-text">
+                        <code>contextKey</code> is a simple string field that tags transitions with the context variable that influenced the routing decision.
+                    </div>
+                </div>
+
+                <h3>📋 Use Cases</h3>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Use Case</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Tracking</strong></td>
+                            <td>Log which context influenced routing</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Analytics</strong></td>
+                            <td>Report on context usage patterns</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Debugging</strong></td>
+                            <td>Understand why a path was taken</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Auditing</strong></td>
+                            <td>Track context-based decisions</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>🔄 How It Works</h3>
+                <div class="info-box warning">
+                    <div class="info-box-title">Important</div>
+                    <div class="info-box-text">
+                        The <code>contextKey</code> does <strong>NOT</strong> affect routing logic. It's metadata only. Both PREMIUM and STANDARD can have the same contextKey value.
+                    </div>
+                </div>
+
+                <h3>📝 Example Flow</h3>
+                <ol style="font-size: 13px; line-height: 1.8; color: #5d6d7e; padding-left: 20px;">
+                    <li>Intent segment executes</li>
+                    <li>Returns result: <strong>PREMIUM</strong></li>
+                    <li>Logs: <code>customerType</code> influenced decision</li>
+                    <li>Routes to Premium Flow</li>
+                    <li>Context metadata stored for analytics</li>
+                </ol>
+
+                <h3>💾 Data Model</h3>
+                <div class="json-example">
+<pre>{
+  "segmentName": "intent_router",
+  "segmentType": "intent",
+  "transitions": {
+    "on": {
+      "PREMIUM": {
+        "nextSegment": "premium_flow",
+        "contextKey": "customerType"
+      },
+      "STANDARD": {
+        "nextSegment": "standard_flow",
+        "contextKey": "customerType"
+      },
+      "BASIC": {
+        "nextSegment": "basic_flow"
+      }
+    }
+  }
+}</pre>
+                </div>
+
+                <h3>🎨 Visual Indicators</h3>
+                <div class="info-box">
+                    <div class="info-box-text">
+                        <strong>Orange edges</strong>: Transitions with contextKey<br>
+                        <strong>Blue edges</strong>: Regular transitions<br>
+                        <strong>📊 ctx badge</strong>: Indicates context metadata<br>
+                        <strong>🔑 icon</strong>: Shows the contextKey name
+                    </div>
+                </div>
+
+                <h3>⚖️ Validation</h3>
+                <div class="info-box warning">
+                    <div class="info-box-title">Validation Rule</div>
+                    <div class="info-box-text">
+                        Each <code>resultName + contextKey</code> combination must be unique within a segment. This prevents duplicate transition definitions.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

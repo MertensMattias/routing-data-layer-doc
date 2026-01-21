@@ -1,0 +1,21 @@
+{
+  "name": "@routing-data-layer/shared-types",
+  "version": "1.0.0",
+  "description": "Shared types and enums for routing data layer application",
+  "main": "types/index.ts",
+  "types": "types/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "types",
+    "shared",
+    "typescript"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      //{
+      //  "command": "./.cursor/hooks/track-file-edits.sh"
+      //}
+    ],
+    "stop": [
+      //{
+      //  "command": "./.cursor/hooks/agent-audit-log.sh"
+      //}
+    ],
+    "beforeSubmitPrompt": [
+      //{
+      //  "command": "./.cursor/hooks/add-audit-instructions.sh"
+      //}
+    ]
+  }
+}
+

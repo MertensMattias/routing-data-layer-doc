@@ -1,0 +1,75 @@
+# Default settings for all files
+[*]
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# TypeScript and JavaScript files (NestJS backend, Next.js frontend)
+[*.{ts,tsx,js,jsx}]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+max_line_length = 120
+
+# PowerShell scripts (Windows automation)
+[*.ps1]
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# JSON files (package.json, tsconfig.json, etc.)
+[*.json]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+
+# YAML files (docker-compose.yml, CI configs)
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+
+# Markdown documentation
+[*.md]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+trim_trailing_whitespace = true
+insert_final_newline = true
+max_line_length = 120
+
+# SQL files (migrations, scripts)
+[*.sql]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# Configuration files
+[*.{ini,conf,config}]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+
+# Shell scripts (bash, sh)
+[*.{sh,bash}]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# Dockerfile
+[Dockerfile*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+
+# Prisma schema
+[*.prisma]
+indent_style = space
+indent_size = 2
+end_of_line = lf

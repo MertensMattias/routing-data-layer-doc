@@ -1,0 +1,31 @@
+{
+    "folders": [
+      {
+        "path": "."
+      }
+    ],
+    "settings": {
+      "markdownlint.ignore": [
+        "archive/**",
+        "node_modules/**"
+      ],
+      "files.exclude": {
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/build": true,
+        "**/.next": true,
+        "**/coverage": true
+      },
+      "search.exclude": {
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/build": true,
+        "**/.next": true,
+        "**/coverage": true,
+        "**/archive": true
+      },
+      "github-actions.workflows.pinned.workflows": [
+        ".github/workflows/suggest-agent-workflow.yml"
+      ]
+    }
+  }
