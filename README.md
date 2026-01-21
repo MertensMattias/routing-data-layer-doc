@@ -10,15 +10,26 @@ The Routing Data Layer provides a three-layer architecture for managing automate
 - **Segment Store**: Defines the flow graph structure with segments and transitions (the "what happens next" logic)
 - **Message Store**: Manages multilingual messages with atomic versioning (the audio content)
 
-Together, these layers enable self-service configuration of IVR systems, allowing business analysts to design call flows without developer intervention while maintaining enterprise-grade safety through draft/publish workflows and comprehensive audit trails.
+Together, these layers provide a comprehensive solution for configuration management, maintenance, and external integration. The system enables dynamic and flexible configuration delivery to IVR setups, ensuring solid message handling and standardized parameters for routing, logging, and reporting. All layers are integrated with a comprehensive audit system that tracks all changes and provides complete modification history, ensuring full traceability and compliance. 
+
+
 
 ## Documentation Structure
 
 ### Design Documents
 
 - **[Routing Table Design](./docs/ROUTING_TABLE_DESIGN.md)** - Architecture and design specification for the routing table module
+
+  ![Routing Management UI](./docs/images/Routing.png)
+
 - **[Segment Store Design](./docs/SEGMENT_STORE_DESIGN.md)** - Architecture and design specification for the segment store module
+
+  ![Segment Configuration UI](./docs/images/SegmentPage.png)
+
 - **[Message Store Design](./docs/MESSAGE_STORE_DESIGN.md)** - Architecture and design specification for the message store module
+
+  ![Message Management UI](./docs/images/MessagePage.png)
+
 - **[Global UI Design](./docs/GLOBAL_UI_DESIGN.md)** - User interface design guidelines and specifications
 
 ### Guides
@@ -32,12 +43,6 @@ Together, these layers enable self-service configuration of IVR systems, allowin
 - **[Deployment Guide](./docs/DEPLOYMENT_GUIDE.md)** - Deployment and infrastructure documentation
 - **[Testing Guide](./docs/TESTING_GUIDE.md)** - Testing strategies and guidelines
 - **[Contributing](./docs/CONTRIBUTING.md)** - Contribution guidelines
-
-### Visual Documentation
-
-- **[Routing Management UI](./docs/images/Routing.png)** - Screenshot of the routing management interface
-- **[Segment Configuration UI](./docs/images/SegmentPage.png)** - Screenshot of the segment configuration interface
-- **[Message Management UI](./docs/images/MessagePage.png)** - Screenshot of the message management interface
 
 ## Key Concepts
 
