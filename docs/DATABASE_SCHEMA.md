@@ -82,7 +82,7 @@ erDiagram
 
     cfg_Dic_Environment {
         int EnvironmentId PK
-        varchar Code UK "dvp/acc/prd"
+        varchar Code "UK: dvp/acc/prd"
         nvarchar DisplayName
         bit IsActive
     }
@@ -115,7 +115,7 @@ erDiagram
 
     rt_RoutingTable {
         int RoutingTableId PK
-        varchar SourceId UK "unique entry point"
+        varchar SourceId "UK: unique entry point"
         varchar RoutingId
         int CompanyProjectId FK
         int MessageStoreId FK "nullable"
@@ -163,7 +163,6 @@ erDiagram
         varchar CreatedBy
         datetime UpdatedAt
         varchar UpdatedBy
-        UK "RoutingId, SegmentName, ChangeSetId"
     }
 
     seg_Key {
@@ -244,7 +243,6 @@ erDiagram
         varchar CreatedBy
         datetime UpdatedAt
         varchar UpdatedBy
-        UK "MessageStoreId, MessageKey"
     }
 
     msg_MessageKeyVersion {
@@ -255,7 +253,6 @@ erDiagram
         bit IsActive
         datetime CreatedAt
         varchar CreatedBy
-        UK "MessageKeyId, Version"
     }
 
     msg_MessageLanguageContent {
@@ -268,7 +265,6 @@ erDiagram
         varchar CreatedBy
         datetime UpdatedAt
         varchar UpdatedBy
-        UK "MessageKeyVersionId, Language"
     }
 
     msg_MessageStoreVoiceConfig {
@@ -317,19 +313,18 @@ erDiagram
         nvarchar DefaultValue
         nvarchar ValidationSchema "JSON schema"
         bit IsActive
-        UK "DicSegmentTypeId, KeyName"
     }
 
     cfg_Dic_KeyType {
         int DicKeyTypeId PK
-        varchar Code UK "string/integer/boolean/json"
+        varchar Code "UK: string/integer/boolean/json"
         nvarchar DisplayName
         bit IsActive
     }
 
     msg_Dic_MessageType {
         int MessageTypeId PK
-        varchar Code UK "tts/audio_url/llm_message/llm_prompt"
+        varchar Code "UK: tts/audio_url/llm_message/llm_prompt"
         nvarchar DisplayName
         nvarchar SettingsSchema "JSON schema"
         nvarchar DefaultSettings "JSON"
@@ -338,7 +333,7 @@ erDiagram
 
     msg_Dic_MessageCategory {
         int CategoryId PK
-        varchar Code UK "welcome/menu/error/etc"
+        varchar Code "UK: welcome/menu/error/etc"
         nvarchar DisplayName
         varchar Icon
         varchar Color

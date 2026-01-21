@@ -110,9 +110,7 @@ graph TB
     style Backend fill:#E0234E
     style Database fill:#CC2927
     style Auth fill:#007FFF
-    style IVR fill:#48B
-
-9D6E
+    style IVR fill:#48B9D6E
 ```
 
 ### Three-Layer Architecture
