@@ -18,15 +18,15 @@ Together, these layers provide a comprehensive solution for configuration manage
 
 ### Design Documents
 
-- **[Routing Table Design](./docs/ROUTING_TABLE_DESIGN.md)** - Architecture and design specification for the routing table module
+- **[Routing Table Design](./docs/images/ROUTING_TABLE_DESIGN.md)** - Architecture and design specification for the routing table module
 
   ![Routing Management UI](./docs/images/Routing.png)
 
-- **[Segment Store Design](./docs/SEGMENT_STORE_DESIGN.md)** - Architecture and design specification for the segment store module
+- **[Segment Store Design](./docs/images/SEGMENT_STORE_DESIGN.md)** - Architecture and design specification for the segment store module
 
   ![Segment Configuration UI](./docs/images/SegmentPage.png)
 
-- **[Message Store Design](./docs/MESSAGE_STORE_DESIGN.md)** - Architecture and design specification for the message store module
+- **[Message Store Design](./docs/images/MESSAGE_STORE_DESIGN.md)** - Architecture and design specification for the message store module
 
   ![Message Management UI](./docs/images/MessagePage.png)
 

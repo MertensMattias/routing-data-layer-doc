@@ -95,7 +95,7 @@ erDiagram
 
     cfg_Dic_Voice {
         int VoiceId PK
-        varchar Code UK
+        varchar Code "UK"
         varchar Engine "google/azure/amazon/elevenlabs"
         varchar Language FK
         varchar Gender "male/female/neutral"
@@ -169,7 +169,7 @@ erDiagram
         int SegmentId PK_FK
         int DicSegmentTypeId PK_FK
         int DicKeyId PK_FK
-        nvarchar Value
+        nvarchar KeyValue
         varchar CreatedBy
         datetime CreatedAt
         varchar UpdatedBy
@@ -297,7 +297,7 @@ erDiagram
 
     cfg_Dic_SegmentType {
         int DicSegmentTypeId PK
-        varchar Code UK
+        varchar Code "UK"
         nvarchar DisplayName
         varchar Category
         bit IsTerminal
