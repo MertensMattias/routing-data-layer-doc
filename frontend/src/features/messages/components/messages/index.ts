@@ -1,1 +1,0 @@
-export { TypeSettingsEditor } from './TypeSettingsEditor';
